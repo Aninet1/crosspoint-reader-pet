@@ -47,6 +47,7 @@
 #include "fontIds.h"
 #include "platform/UsbSerialJtagHandoff.h"
 #include "pocketpets/PetStore.h"
+#include "pocketpets/TodoSync.h"
 #include "util/ButtonNavigator.h"
 #include "util/PluginEvents.h"
 #include "util/ScreenshotUtil.h"
@@ -479,18 +480,22 @@ void enterDeepSleep(bool fromTimeout = false) {
   const bool bluetoothStopped = bleturner::beforeSleep(2000);
   if (!bluetoothStopped) LOG_ERR("SLP", "Bluetooth did not stop; deferring sleep-event delivery");
   deliverSleepPluginEvents(bluetoothStopped);
+  // Pocket Pets to-do: refresh the list while going to sleep once the sync time has passed.
+  if (bluetoothStopped && powerManager.getBatteryPercentage() >= 20) TODO_STORE.syncIfDue();
 
+  // Pocket Pets' status board stays on the panel through sleep.
+  const bool keepFrame = activityManager.keepsFrameOnSleep();
   const bool isQuickResumeSleep =
-      SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
-      (fromTimeout &&
-       SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT);
+      !keepFrame && (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
+                     (fromTimeout && SETTINGS.quickResumeSleepScreen ==
+                                         CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT));
   // Every sleep mode leaves a complete retained frame on the e-ink panel. Keep
   // it visible until the first useful reader or home paint replaces it.
   APP_STATE.showBootScreen = false;
 
   APP_STATE.saveToFile();
 
-  activityManager.goToSleep(fromTimeout);
+  if (!keepFrame) activityManager.goToSleep(fromTimeout);
 
   if (isQuickResumeSleep) {
     saveSleepFrameBuffer();
@@ -668,6 +673,7 @@ void setup() {
   timezones::applyToClock();
   RECENT_BOOKS.loadFromFile();
   PET_STORE.loadFromFile();
+  TODO_STORE.loadFromFile();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();

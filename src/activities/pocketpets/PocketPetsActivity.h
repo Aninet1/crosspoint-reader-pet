@@ -18,6 +18,8 @@ class PocketPetsActivity final : public Activity {
   void render(RenderLock&&) override;
   bool preventAutoSleep() override;
   bool skipLoopDelay() override { return motionActive(); }
+  // The status board stays on the e-paper through deep sleep.
+  bool keepsFrameOnSleep() const override { return ui.screen == pp::Screen::StatusFull; }
 
  private:
   pp::UiState ui;
@@ -31,6 +33,7 @@ class PocketPetsActivity final : public Activity {
   uint32_t lastTickMs = 0;
   uint32_t lastHomeRefreshMs = 0;
   uint32_t poseResetAtMs = 0;
+  uint32_t todoSyncAtMs = 0;  // a to-do sync waiting for the "Syncing" screen to show
   int fastRefreshes = 0;
   bool fullRefreshNext = true;
 
@@ -67,5 +70,7 @@ class PocketPetsActivity final : public Activity {
   void finishShake();
   bool motionActive() const;
   void editText(bool petName);
+  void editTodoText(bool token);
+  void requestTodoSync();
   void adoptKeepingCredit(pp::Species sp);
 };

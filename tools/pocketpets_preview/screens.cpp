@@ -71,10 +71,15 @@ int main(int argc, char** argv) {
   ui.screen = Screen::StatusMenu;
   shot("12_status_menu", ui, pet, clk);
   ui.screen = Screen::StatusFull;
-  ui.status = 3;
-  shot("13_status_full", ui, pet, clk);
-  ui.status = 4;
-  shot("13b_status_rest", ui, pet, clk);
+  ui.sinceValid = true;
+  ui.sinceHour = 9;
+  ui.sinceMinute = 41;
+  for (int i = 0; i < STATUS_COUNT; ++i) {
+    ui.status = i;
+    char n[32];
+    snprintf(n, sizeof n, "30_status_%02d", i);
+    shot(n, ui, pet, clk);
+  }
   ui.screen = Screen::Answers;
   ui.ans = AnsPhase::Ask;
   ui.shakePct = 40;
@@ -82,9 +87,55 @@ int main(int argc, char** argv) {
   ui.ans = AnsPhase::Result;
   ui.answer = 15;
   shot("15_answer_msg", ui, pet, clk);
-  ui.yesNo = true;
+  ui.ansMode = 1;
   ui.answer = 0;
   shot("16_answer_yes", ui, pet, clk);
+  ui.ansMode = 2;
+  ui.ans = AnsPhase::Ask;
+  shot("16b_tarot_ask", ui, pet, clk);
+  ui.ans = AnsPhase::Result;
+  for (int i = 0; i < TAROT_COUNT; ++i) {
+    ui.answer = i;
+    ui.reversed = i == 16;
+    char n[32];
+    snprintf(n, sizeof n, "40_tarot_%02d", i);
+    shot(n, ui, pet, clk);
+  }
+  ui.ansMode = 0;
+  {
+    TodoList todo;
+    snprintf(todo.token, sizeof todo.token, "x");
+    const char* tasks[] = {"Submit cryptography assignment 3",
+                           "Reply to the case comp team",
+                           "Buy oat milk",
+                           "Read two chapters",
+                           "Book flu shot",
+                           "Water the real plants",
+                           "Plan weekend"};
+    const char* dues[] = {"2025-11-15", "2025-11-16", "2025-11-16", "2025-11-16", "2025-11-17", "2025-11-21", ""};
+    for (int i = 0; i < 7; ++i) {
+      TodoItem& it = todo.items[todo.count++];
+      snprintf(it.id, sizeof it.id, "%d", i);
+      snprintf(it.text, sizeof it.text, "%s", tasks[i]);
+      snprintf(it.due, sizeof it.due, "%s", dues[i]);
+      it.priority = i == 0 ? 4 : i == 1 ? 3 : 1;
+      it.done = i == 2;
+    }
+    todo.lastSync = clk.epoch - 2 * 3600;
+    UiState t;
+    t.todo = &todo;
+    t.screen = Screen::Todo;
+    shot("50_todo", t, pet, clk);
+    t.todoPage = 1;
+    shot("51_todo_p2", t, pet, clk);
+    t.screen = Screen::TodoSettings;
+    shot("52_todo_settings", t, pet, clk);
+    TodoList empty;
+    t.todo = &empty;
+    t.screen = Screen::Todo;
+    t.todoPage = 0;
+    shot("53_todo_notoken", t, pet, clk);
+  }
   ui.screen = Screen::Guide;
   for (int i = 0; i < GUIDE_PAGES; ++i) {
     ui.guidePage = i;

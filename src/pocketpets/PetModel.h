@@ -77,6 +77,8 @@ struct PetState {
 
   uint16_t pomodoros = 0;
   bool soundOn = true;
+  bool chatterOn = false;  // mix in book chatter (talk about the book being read)
+  bool quotesOn = false;   // mix in the owner's own quotes
   bool guideSeen = false;
   uint8_t recentLines[3] = {255, 255, 255};
   uint32_t rng = 0x9E3779B9u;
@@ -123,6 +125,8 @@ class PetModel {
   Event play(const Clock& c);
   Event callBack(const Clock& c);
   void pomodoroDone(const Clock& c);
+  // A to-do item ticked off: a little care, and it counts toward an Active pet.
+  void taskDone(const Clock& c);
 
   bool canAfford(int item) const { return s.readCreditSec >= FOODS[item].costMin * 60u; }
   int stageProgressPct() const;  // progress to the next stage, 100 for adults

@@ -45,6 +45,9 @@ class Activity {
 
   virtual bool skipLoopDelay() { return false; }
   virtual bool preventAutoSleep() { return false; }
+  // True when the current screen should stay on the panel during deep sleep
+  // instead of the sleep screen.
+  virtual bool keepsFrameOnSleep() const { return false; }
   // Exclusive storage activities suspend global controls and normal activity
   // transitions so no filesystem code races a raw SD-card owner.
   virtual bool requiresExclusiveStorageLoop() const { return false; }

@@ -185,6 +185,7 @@ class EpubReaderActivity final : public ReaderActivity {
   void handleOverlayInput();
   void renderOverlay();
   std::string currentChapterTitle() const;
+  void notePetPage(const Page& page);
   // Text panel rows (font, size, line spacing, alignment, focus reading).
   std::string textRowName(int row) const;
   std::string textRowValue(int row) const;

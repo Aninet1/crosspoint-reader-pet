@@ -1,5 +1,6 @@
 #include "PetStore.h"
 
+#include <HalStorage.h>
 #include <Logging.h>
 #include <TrustedTime.h>
 
@@ -45,6 +46,84 @@ void PetStore::addReadingMs(uint32_t ms) {
   unsavedSec += sec;
   dirty = true;
   if (unsavedSec >= SAVE_EVERY_READ_SEC) flush();
+}
+
+namespace {
+// Calls fn(line, len) for each quote line in the file; stops when fn returns false.
+template <typename Fn>
+void forEachQuote(const String& text, Fn fn) {
+  int start = 0;
+  const int n = static_cast<int>(text.length());
+  while (start < n) {
+    int end = text.indexOf('\n', start);
+    if (end < 0) end = n;
+    int a = start, b = end;
+    while (a < b && (text[a] == ' ' || text[a] == '\t' || text[a] == '\r')) ++a;
+    while (b > a && (text[b - 1] == ' ' || text[b - 1] == '\t' || text[b - 1] == '\r')) --b;
+    if (b > a && text[a] != '#' && !fn(text.c_str() + a, b - a)) return;
+    start = end + 1;
+  }
+}
+}  // namespace
+
+int PetStore::quoteCount() const {
+  if (!Storage.exists(QUOTES_FILE)) return 0;
+  const String text = Storage.readFile(QUOTES_FILE);
+  int n = 0;
+  forEachQuote(text, [&](const char*, int) {
+    ++n;
+    return true;
+  });
+  return n;
+}
+
+bool PetStore::randomQuote(uint32_t rnd, char* buf, int len) const {
+  if (!Storage.exists(QUOTES_FILE)) return false;
+  const String text = Storage.readFile(QUOTES_FILE);
+  int n = 0;
+  forEachQuote(text, [&](const char*, int) {
+    ++n;
+    return true;
+  });
+  if (n == 0) return false;
+  int pick = static_cast<int>(rnd % n);
+  bool found = false;
+  forEachQuote(text, [&](const char* line, int lineLen) {
+    if (pick-- > 0) return true;
+    snprintf(buf, len, "%.*s", lineLen, line);
+    found = true;
+    return false;
+  });
+  return found;
+}
+
+bool PetStore::addQuote(const char* text) {
+  if (!text || !*text) return false;
+  Storage.ensureDirectoryExists("/pocketpets");
+  String all = Storage.exists(QUOTES_FILE) ? Storage.readFile(QUOTES_FILE) : String();
+  if (all.length() && !all.endsWith("\n")) all += "\n";
+  all += text;
+  all += "\n";
+  return Storage.writeFile(QUOTES_FILE, all);
+}
+
+const char* PetStore::speak(const pp::Clock& clk, char* buf, int len) {
+  const pp::PetState& s = model.s;
+  const bool urgent = s.fullness < 30 || s.energy < 25 || model.isNight(clk);
+  if (!urgent && s.stage != pp::Stage::Egg && (s.chatterOn || s.quotesOn)) {
+    // Roughly a third of lines come from the extras, split between them.
+    const uint32_t roll = (s.rng >> 5) % 100;
+    model.s.rng = model.s.rng * 1664525u + 1013904223u;
+    const bool both = s.chatterOn && s.quotesOn;
+    const bool tryQuote = s.quotesOn && (both ? roll < 18 : roll < 35);
+    const bool tryBook = s.chatterOn && !tryQuote && (both ? roll < 38 : roll < 35);
+    if (tryQuote && randomQuote(model.s.rng >> 7, buf, len)) return buf;
+    if (tryBook) {
+      std::lock_guard<std::mutex> lock(chatterMutex);
+      if (chatter.line(s, model.s.rng >> 9, buf, len)) return buf;
+    }
+  }
+  return model.line(clk, buf, len);
 }
 
 void PetStore::flush() {
@@ -93,7 +172,29 @@ void PetStore::toJson(JsonDocument& doc) const {
   doc["sound"] = s.soundOn;
   doc["guideSeen"] = s.guideSeen;
   doc["rng"] = s.rng;
+  doc["chatter"] = s.chatterOn;
+  doc["quotes"] = s.quotesOn;
   doc["customStatus"] = customStatus;
+
+  std::lock_guard<std::mutex> lock(chatterMutex);
+  const pp::BookMemory& b = chatter.m;
+  JsonObject book = doc["book"].to<JsonObject>();
+  book["title"] = b.title;
+  book["author"] = b.author;
+  book["chapter"] = b.chapter;
+  book["prev"] = b.prevTitle;
+  book["word"] = b.word;
+  book["quote"] = b.quote;
+  book["pages"] = b.pages;
+  JsonArray genre = book["genre"].to<JsonArray>();
+  for (uint16_t g : b.genre) genre.add(g);
+  JsonArray names = book["names"].to<JsonArray>();
+  for (const auto& n : b.names) {
+    if (!n.count) continue;
+    JsonObject o = names.add<JsonObject>();
+    o["n"] = n.text;
+    o["c"] = n.count;
+  }
 }
 
 bool PetStore::fromJson(JsonVariantConst doc) {
@@ -137,7 +238,34 @@ bool PetStore::fromJson(JsonVariantConst doc) {
   s.soundOn = doc["sound"] | true;
   s.guideSeen = doc["guideSeen"] | false;
   s.rng = doc["rng"] | 0x9E3779B9u;
+  s.chatterOn = doc["chatter"] | false;
+  s.quotesOn = doc["quotes"] | false;
   model.s = s;
+
+  {
+    std::lock_guard<std::mutex> lock(chatterMutex);
+    pp::BookMemory b;
+    JsonVariantConst book = doc["book"];
+    strncpy(b.title, book["title"] | "", sizeof(b.title) - 1);
+    strncpy(b.author, book["author"] | "", sizeof(b.author) - 1);
+    strncpy(b.chapter, book["chapter"] | "", sizeof(b.chapter) - 1);
+    strncpy(b.prevTitle, book["prev"] | "", sizeof(b.prevTitle) - 1);
+    strncpy(b.word, book["word"] | "", sizeof(b.word) - 1);
+    strncpy(b.quote, book["quote"] | "", sizeof(b.quote) - 1);
+    b.pages = book["pages"] | 0u;
+    int gi = 0;
+    for (JsonVariantConst g : book["genre"].as<JsonArrayConst>()) {
+      if (gi < static_cast<int>(pp::Genre::Count)) b.genre[gi++] = g | 0;
+    }
+    int ni = 0;
+    for (JsonVariantConst o : book["names"].as<JsonArrayConst>()) {
+      if (ni >= pp::BookMemory::NAME_SLOTS) break;
+      strncpy(b.names[ni].text, o["n"] | "", sizeof(b.names[ni].text) - 1);
+      b.names[ni].count = o["c"] | 0;
+      ++ni;
+    }
+    chatter.m = b;
+  }
   strncpy(customStatus, doc["customStatus"] | "BACK SOON", sizeof(customStatus) - 1);
   customStatus[sizeof(customStatus) - 1] = 0;
   return true;

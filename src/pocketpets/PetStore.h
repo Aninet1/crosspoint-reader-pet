@@ -5,6 +5,9 @@
 #include <ArduinoJson.h>
 #include <PersistableStore.h>
 
+#include <mutex>
+
+#include "BookChatter.h"
 #include "PetModel.h"
 
 class PetStore : public PersistableStore<PetStore> {
@@ -18,6 +21,9 @@ class PetStore : public PersistableStore<PetStore> {
 
  public:
   pp::PetModel model;
+  // Written by the reader's render task, read by the pet screens and saving.
+  pp::BookChatter chatter;
+  mutable std::mutex chatterMutex;
   char customStatus[24] = "BACK SOON";
 
   static const char* getFilePath() { return "/.crosspoint/pet.json"; }
@@ -31,6 +37,15 @@ class PetStore : public PersistableStore<PetStore> {
   // Writes to SD at most every five minutes of reading.
   void addReadingMs(uint32_t ms);
   void markDirty() { dirty = true; }
+  // Pet speech: its own lines, mixed with book chatter and your quotes when
+  // those are switched on.
+  const char* speak(const pp::Clock& clk, char* buf, int len);
+
+  static constexpr const char* QUOTES_FILE = "/pocketpets/quotes.txt";
+  // A random line from the quotes file (blank lines and # comments skipped).
+  bool randomQuote(uint32_t rnd, char* buf, int len) const;
+  int quoteCount() const;
+  bool addQuote(const char* text);
   // Writes pending changes (sleep entry, leaving the pet app).
   void flush();
 };

@@ -13,9 +13,12 @@ struct PetLook {
   Pose pose = Pose::Idle;
   bool hungry = false;
   bool sleeping = false;
+  enum Wear : uint8_t { NoWear, Headphones, Nightcap };
+  Wear wear = NoWear;
 };
 
 enum class Icon : uint8_t {
+  None,
   Food,
   Play,
   Pet,

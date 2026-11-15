@@ -13,6 +13,7 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "fontIds.h"
 #include "pocketpets/PetStore.h"
+#include "pocketpets/TodoSync.h"
 
 using namespace pp;
 
@@ -147,6 +148,7 @@ void PocketPetsActivity::onEnter() {
   savedOrientation = renderer.getOrientation();
   buzzerReady = buzzer.begin();
   ui.hasImu = halTiltSensor.isAvailable();
+  ui.todo = &TODO_STORE.list;
   strncpy(ui.customStatus, PET_STORE.customStatus, sizeof(ui.customStatus) - 1);
 
   PetModel& pet = PET_STORE.model;
@@ -208,6 +210,11 @@ void PocketPetsActivity::go(Screen screen) {
       ui.ans = AnsPhase::Ask;
       ui.shakePct = 0;
     }
+    if (screen == Screen::Todo && ui.todoPage * TODO_PER_PAGE >= TODO_STORE.list.count) ui.todoPage = 0;
+  }
+  if (screen == Screen::Todo) {
+    TODO_STORE.importTokenFromSd();
+    if (TODO_STORE.list.syncDue(PetStore::now())) requestTodoSync();
   }
   shakeMs = 0;
   baseAxis = -1;
@@ -274,6 +281,18 @@ void PocketPetsActivity::loop() {
     requestUpdate();
   }
 
+  if (todoSyncAtMs && now >= todoSyncAtMs) {
+    todoSyncAtMs = 0;
+    TODO_STORE.sync();
+    {
+      RenderLock lock;
+      ui.syncing = false;
+      if (ui.todoPage * TODO_PER_PAGE >= TODO_STORE.list.count) ui.todoPage = 0;
+    }
+    relayout();
+    requestUpdate();
+  }
+
   updatePomodoro(now);
   updateMotion(now);
 
@@ -282,7 +301,7 @@ void PocketPetsActivity::loop() {
   int x = 0, y = 0;
   if (mappedInput.wasScreenLongPress(x, y)) {
     for (int i = 0; i < buttonCount; ++i) {
-      if (buttons[i].box.contains(x, y) && buttons[i].act == Act::StatusPick && buttons[i].arg == 5) {
+      if (buttons[i].box.contains(x, y) && buttons[i].act == Act::StatusPick && buttons[i].arg == STATUS_CUSTOM) {
         editText(false);
         return;
       }
@@ -336,7 +355,7 @@ void PocketPetsActivity::say(const char* text) {
 void PocketPetsActivity::sayLine() {
   char buf[96];
   RenderLock lock;
-  PET_STORE.model.line(PetStore::now(), buf, sizeof(buf));
+  PET_STORE.speak(PetStore::now(), buf, sizeof(buf));
   snprintf(ui.bubble, sizeof(ui.bubble), "%s", buf);
 }
 
@@ -558,6 +577,7 @@ void PocketPetsActivity::act(const Button& b) {
       go(Screen::Guide);
       return;
     case Act::OpenSettings:
+      ui.quoteCount = PET_STORE.quoteCount();
       go(Screen::Settings);
       return;
     case Act::Close:
@@ -642,8 +662,13 @@ void PocketPetsActivity::act(const Button& b) {
       ui.pomo = PomoPhase::Setup;
       break;
 
-    case Act::StatusPick:
+    case Act::StatusPick: {
+      RenderLock lock;
       ui.status = b.arg;
+      ui.sinceValid = clk.valid;
+      ui.sinceHour = clk.hour;
+      ui.sinceMinute = clk.minute;
+    }
       go(Screen::StatusFull);
       return;
     case Act::StatusBack:
@@ -651,7 +676,7 @@ void PocketPetsActivity::act(const Button& b) {
       return;
 
     case Act::AnsMode:
-      ui.yesNo = b.arg == 1;
+      ui.ansMode = static_cast<uint8_t>(b.arg);
       break;
     case Act::AnsHold:
       if (ui.hasImu) {
@@ -685,6 +710,85 @@ void PocketPetsActivity::act(const Button& b) {
       PET_STORE.markDirty();
       chirp(4);
       break;
+    case Act::AppTodo:
+      go(Screen::Todo);
+      return;
+    case Act::TodoToggle: {
+      bool nowDone;
+      {
+        RenderLock lock;
+        nowDone = TODO_STORE.list.toggle(b.arg);
+        if (nowDone) pet.taskDone(clk);
+      }
+      TODO_STORE.saveToFile();
+      if (nowDone) {
+        PET_STORE.markDirty();
+        chirp(TODO_STORE.list.remaining() == 0 ? 2 : 0);
+        checkBanners();
+      }
+      break;
+    }
+    case Act::TodoSync:
+      requestTodoSync();
+      break;
+    case Act::TodoOpenSettings:
+      go(Screen::TodoSettings);
+      return;
+    case Act::TodoPrev:
+      if (ui.todoPage > 0) --ui.todoPage;
+      break;
+    case Act::TodoNext:
+      if ((ui.todoPage + 1) * TODO_PER_PAGE < TODO_STORE.list.count) ++ui.todoPage;
+      break;
+    case Act::TodoSetToken:
+      editTodoText(true);
+      return;
+    case Act::TodoSetFilter:
+      editTodoText(false);
+      return;
+    case Act::TodoSetSchedule: {
+      RenderLock lock;
+      pp::TodoList& l = TODO_STORE.list;
+      l.schedule =
+          static_cast<SyncSchedule>((static_cast<int>(l.schedule) + 1) % static_cast<int>(SyncSchedule::Count));
+    }
+      TODO_STORE.saveToFile();
+      break;
+    case Act::TodoHourDown:
+    case Act::TodoHourUp: {
+      RenderLock lock;
+      pp::TodoList& l = TODO_STORE.list;
+      l.schedule = SyncSchedule::Daily;
+      l.dailyHour = static_cast<uint8_t>((l.dailyHour + (b.act == Act::TodoHourUp ? 1 : 23)) % 24);
+    }
+      TODO_STORE.saveToFile();
+      break;
+
+    case Act::SetChatter: {
+      // Pet only -> + quotes -> + book chatter -> all three.
+      RenderLock lock;
+      const int mode = (pet.s.quotesOn ? 1 : 0) + (pet.s.chatterOn ? 2 : 0);
+      const int next = mode == 0 ? 1 : mode == 1 ? 2 : mode == 2 ? 3 : 0;
+      pet.s.quotesOn = next & 1;
+      pet.s.chatterOn = next & 2;
+      PET_STORE.markDirty();
+      break;
+    }
+    case Act::SetAddQuote:
+      startActivityForResult(
+          std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "A quote for your pet", "", 90),
+          [this](const ActivityResult& result) {
+            if (result.isCancelled) return;
+            const auto* k = std::get_if<KeyboardResult>(&result.data);
+            if (k && !k->text.empty() && PET_STORE.addQuote(k->text.c_str())) {
+              RenderLock lock;
+              PET_STORE.model.s.quotesOn = true;
+              ui.quoteCount = PET_STORE.quoteCount();
+              PET_STORE.markDirty();
+            }
+            fullRefreshNext = true;
+          });
+      return;
     case Act::SetCollection:
       go(Screen::Collection);
       return;
@@ -740,6 +844,9 @@ void PocketPetsActivity::back() {
     case Screen::StatusFull:
       go(Screen::StatusMenu);
       return;
+    case Screen::TodoSettings:
+      go(Screen::Todo);
+      return;
     case Screen::Collection:
     case Screen::ConfirmNew:
       go(Screen::Settings);
@@ -776,7 +883,7 @@ void PocketPetsActivity::editText(bool petName) {
                                    for (char* p = ui.customStatus; *p; ++p)
                                      *p = static_cast<char>(toupper(static_cast<unsigned char>(*p)));
                                    memcpy(PET_STORE.customStatus, ui.customStatus, sizeof(ui.customStatus));
-                                   ui.status = 5;
+                                   ui.status = STATUS_CUSTOM;
                                  }
                                  PET_STORE.markDirty();
                                }
@@ -784,6 +891,41 @@ void PocketPetsActivity::editText(bool petName) {
                            }
                            renderer.setOrientation(isLandscape(ui.screen) ? GfxRenderer::LandscapeCounterClockwise
                                                                           : GfxRenderer::Portrait);
+                           fullRefreshNext = true;
+                         });
+}
+
+void PocketPetsActivity::requestTodoSync() {
+  {
+    RenderLock lock;
+    ui.syncing = true;
+  }
+  todoSyncAtMs = millis() + 600;  // let the "Syncing" screen draw first
+  relayout();
+  requestUpdate();
+}
+
+void PocketPetsActivity::editTodoText(bool token) {
+  const std::string initial = token ? TODO_STORE.list.token : TODO_STORE.list.filter;
+  startActivityForResult(std::make_unique<KeyboardEntryActivity>(
+                             renderer, mappedInput, token ? "Todoist API token" : "Todoist filter", initial, 63),
+                         [this, token](const ActivityResult& result) {
+                           if (result.isCancelled) return;
+                           const auto* k = std::get_if<KeyboardResult>(&result.data);
+                           if (!k) return;
+                           {
+                             RenderLock lock;
+                             pp::TodoList& l = TODO_STORE.list;
+                             if (token) {
+                               snprintf(l.token, sizeof(l.token), "%s", k->text.c_str());
+                             } else {
+                               snprintf(l.filter, sizeof(l.filter), "%s",
+                                        k->text.empty() ? "today | overdue" : k->text.c_str());
+                             }
+                             l.lastSync = 0;  // fetch again with the new settings
+                             l.lastError[0] = 0;
+                           }
+                           TODO_STORE.saveToFile();
                            fullRefreshNext = true;
                          });
 }
@@ -867,7 +1009,9 @@ void PocketPetsActivity::updateMotion(uint32_t now) {
       if (++ui.thinkFrame >= 4) {
         ui.ans = AnsPhase::Result;
         const uint32_t r = PET_STORE.model.s.rng = PET_STORE.model.s.rng * 1664525u + 1013904223u + now;
-        ui.answer = ui.yesNo ? static_cast<int>((r >> 8) % 3) : static_cast<int>((r >> 8) % answerCount());
+        const int pool = ui.ansMode == 1 ? 3 : ui.ansMode == 2 ? TAROT_COUNT : answerCount();
+        ui.answer = static_cast<int>((r >> 8) % pool);
+        ui.reversed = ui.ansMode == 2 && ((r >> 3) & 3) == 0;  // about one card in four
         lock.unlock();
         chirp(2);
         relayout();

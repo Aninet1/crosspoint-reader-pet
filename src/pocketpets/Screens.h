@@ -5,6 +5,7 @@
 #include "PetArt.h"
 #include "PetCanvas.h"
 #include "PetModel.h"
+#include "TodoList.h"
 
 namespace pp {
 
@@ -20,7 +21,9 @@ enum class Screen : uint8_t {
   Guide,
   Settings,
   Collection,
-  ConfirmNew
+  ConfirmNew,
+  Todo,
+  TodoSettings
 };
 
 enum class Act : uint8_t {
@@ -41,6 +44,17 @@ enum class Act : uint8_t {
   AppStatus,
   AppAnswers,
   ExitToReader,
+  AppTodo,
+  TodoToggle,
+  TodoSync,
+  TodoOpenSettings,
+  TodoPrev,
+  TodoNext,
+  TodoSetToken,
+  TodoSetFilter,
+  TodoSetSchedule,
+  TodoHourDown,
+  TodoHourUp,
   PomoPreset,
   PomoCustom,
   PomoKey,
@@ -62,6 +76,8 @@ enum class Act : uint8_t {
   GuideNext,
   SetRename,
   SetSound,
+  SetChatter,
+  SetAddQuote,
   SetCollection,
   SetGuide,
   SetNewPet,
@@ -98,10 +114,13 @@ struct UiState {
 
   // Status board
   int status = 0;
-  char customStatus[24] = "BACK SOON";
+  char customStatus[24] = "HELLO!";
+  bool sinceValid = false;  // time the status was set, shown as "since 9:41"
+  uint8_t sinceHour = 0, sinceMinute = 0;
 
   // Book of Answers
-  bool yesNo = false;
+  uint8_t ansMode = 0;    // 0 message, 1 yes or no, 2 tarot
+  bool reversed = false;  // tarot card drawn upside down
   AnsPhase ans = AnsPhase::Ask;
   int answer = 0;
   int thinkFrame = 0;
@@ -109,12 +128,21 @@ struct UiState {
   int shakePct = 0;
 
   int guidePage = 0;
+
+  // To-do
+  const TodoList* todo = nullptr;  // owned by the device store
+  int todoPage = 0;
+  bool syncing = false;
+  int quoteCount = 0;  // lines in the quotes file, for Settings
   int adoptFocus = 0;
 };
 
-constexpr int STATUS_COUNT = 6;
+constexpr int STATUS_COUNT = 12;
+constexpr int STATUS_SLEEPING = 8;
+constexpr int STATUS_CUSTOM = STATUS_COUNT - 1;
 extern const char* const STATUS_LABELS[STATUS_COUNT];
 constexpr int GUIDE_PAGES = 6;
+constexpr int TODO_PER_PAGE = 6;
 
 // Fills `out` with the buttons of the current screen; returns how many.
 int layout(const UiState& ui, const PetModel& pet, const Clock& clk, int w, int h, Button* out);
@@ -133,5 +161,12 @@ void drawBigDigits(Canvas& c, int cx, int y, int digitH, const char* text);
 int answerCount();
 const char* answerText(int index);
 const char* yesNoText(int index);  // index 0..2
+
+// Tarot: the 22 Major Arcana.
+constexpr int TAROT_COUNT = 22;
+const char* tarotName(int card);
+const char* tarotMeaning(int card, bool reversed);
+void drawTarotCard(Canvas& c, int card, bool reversed, int cx, int cy, int h);
+void drawTarotBack(Canvas& c, int cx, int cy, int h);
 
 }  // namespace pp

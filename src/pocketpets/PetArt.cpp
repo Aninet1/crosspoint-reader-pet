@@ -132,6 +132,28 @@ void drawAccessory(const Pen& p, const PetLook& look, float fx, float fy, float 
   }
 }
 
+// Headphones or a nightcap on a head centred at (hx, hy) with radius hr.
+void drawHeadwear(const Pen& p, const PetLook& look, float hx, float hy, float hr) {
+  if (look.wear == PetLook::Headphones) {
+    p.arc(hx, hy + hr * 0.05f, hr * 1.04f, 200, 340, hr * 0.11f);
+    for (int s = -1; s <= 1; s += 2) {
+      Shape cup[2] = {p.ell(hx + s * hr * 0.98f, hy - hr * 0.05f, hr * 0.2f, hr * 0.3f),
+                      p.ell(hx + s * hr * 0.9f, hy - hr * 0.05f, hr * 0.12f, hr * 0.22f)};
+      p.c.outlined(cup, 2, p.R(1.6f), Ink::Dark);
+    }
+  } else if (look.wear == PetLook::Nightcap) {
+    // Floppy cap flopping to one side, with a pompom.
+    const float top = hy + hr * 0.82f;
+    Shape cap[3] = {p.tri(hx - hr * 0.62f, top - hr * 0.1f, hx + hr * 0.5f, top, hx + hr * 1.05f, top - hr * 0.32f),
+                    p.ell(hx - hr * 0.05f, top + hr * 0.12f, hr * 0.56f, hr * 0.3f),
+                    p.ell(hx + hr * 0.62f, top + hr * 0.02f, hr * 0.3f, hr * 0.2f)};
+    p.c.outlined(cap, 3, p.R(1.6f), Ink::Gray);
+    p.c.outlined(p.ell(hx + hr * 1.08f, top - hr * 0.34f, hr * 0.13f, hr * 0.13f), p.R(1.4f));
+    const Shape brim = p.cap(hx - hr * 0.62f, top - hr * 0.12f, hx + hr * 0.52f, top - hr * 0.04f, hr * 0.08f);
+    p.c.outlined(brim, p.R(1.4f));
+  }
+}
+
 struct Body {
   float bodyRx, bodyRy, bodyY, headRx, headRy, headY;
 };
@@ -183,6 +205,7 @@ void drawDog(const Pen& p, const PetLook& look) {
     p.c.outlined(p.ell(0, b.bodyY + b.bodyRy * 0.42f, 4, 4), p.R(1.4f));
   }
   drawAccessory(p, look, 0, fy, gap, eye, b.headY + b.headRy, b.bodyY + b.bodyRy * 0.55f);
+  drawHeadwear(p, look, 0, b.headY, b.headRx);
 }
 
 void drawCat(const Pen& p, const PetLook& look) {
@@ -246,6 +269,7 @@ void drawCat(const Pen& p, const PetLook& look) {
     p.c.outlined(bow, 3, p.R(1.5f), Ink::Gray);
   }
   drawAccessory(p, look, 0, fy, gap, eye, b.headY + hry, b.bodyY + b.bodyRy * 0.55f);
+  drawHeadwear(p, look, 0, b.headY + hry * 0.1f, hrx);
 }
 
 void drawCloud(const Pen& p, const PetLook& look) {
@@ -288,6 +312,7 @@ void drawCloud(const Pen& p, const PetLook& look) {
     }
   }
   drawAccessory(p, look, 0, lift + 22, 26 * k, eye, lift + 36, lift + 6);
+  drawHeadwear(p, look, 0, lift + 28, 30 * k);
 }
 
 void drawLeaf(const Pen& p, float x, float y, float len, float deg) {
@@ -348,6 +373,7 @@ void drawPlant(const Pen& p, const PetLook& look) {
     p.c.heart(p.X(14), p.Y(7), p.R(6), Ink::Gray);
   }
   drawAccessory(p, look, 0, 19, 24, eye, 30, 8);
+  if (look.wear == PetLook::Headphones) drawHeadwear(p, look, 0, 22, 28);
 }
 
 }  // namespace
@@ -644,6 +670,8 @@ void drawIcon(Canvas& c, Icon icon, int cx, int cy, int size) {
       c.poly(xs, ys, 3, Ink::Black);
       break;
     }
+    case Icon::None:
+      break;
     case Icon::Stop:
       c.roundRect(p.X(-34), p.Y(84), p.R(68), p.R(68), p.R(10), Ink::Black);
       break;

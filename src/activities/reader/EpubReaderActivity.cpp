@@ -22,6 +22,7 @@
 #include <functional>
 #include <iterator>
 #include <limits>
+#include <mutex>
 
 #include "../../util/BookmarkFile.h"
 #include "BookmarkEntry.h"
@@ -57,6 +58,7 @@
 #include "clippings/ClippingsManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "pocketpets/PetStore.h"
 #include "util/BookmarkUtil.h"
 #include "util/ButtonNavigator.h"
 #include "util/ScreenshotUtil.h"
@@ -2007,6 +2009,7 @@ void EpubReaderActivity::renderBook() {
     // needs that slot, then snapshot the newly rendered page below.
     discardOverlayPage();
 
+    notePetPage(*p);
     const auto start = millis();
     renderContents(std::move(p), orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
     LOG_DBG("ERS", "Rendered page in %dms", millis() - start);
@@ -2580,6 +2583,28 @@ bool EpubReaderActivity::usesToolbarMenu() const {
   // Both board classes drive the same chrome: touch through the FreeInkUI tap
   // targets, buttons through the focused-tool pill and the panel cursor.
   return SETTINGS.readerMenuStyle == CrossPointSettings::READER_MENU_TOOLBAR;
+}
+
+// Pocket Pets book chatter: one pass over the page's words, skipped when the
+// pet is off or the same page is drawn again.
+void EpubReaderActivity::notePetPage(const Page& page) {
+  if (!epub || !PET_STORE.model.s.adopted || !PET_STORE.model.s.chatterOn) return;
+  std::lock_guard<std::mutex> lock(PET_STORE.chatterMutex);
+  const uint32_t key = (static_cast<uint32_t>(currentSpineIndex) << 22) ^ page.visibleTextOffset;
+  const std::string chapter = currentChapterTitle();
+  if (!PET_STORE.chatter.beginPage(epub->getTitle().c_str(), epub->getAuthor().c_str(), chapter.c_str(), key)) {
+    return;
+  }
+  for (const auto& element : page.elements) {
+    if (element->getTag() != TAG_PageLine) continue;
+    const TextBlock* block = static_cast<const PageLine&>(*element).getBlock();
+    if (!block) continue;
+    for (uint16_t i = 0; i < block->wordCount(); ++i) {
+      PET_STORE.chatter.addWord(block->wordText(i), block->wordTextLen(i));
+    }
+  }
+  PET_STORE.chatter.endPage();
+  PET_STORE.markDirty();
 }
 
 std::string EpubReaderActivity::currentChapterTitle() const {

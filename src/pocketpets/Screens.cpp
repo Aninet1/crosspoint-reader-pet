@@ -5,7 +5,24 @@
 
 namespace pp {
 
-const char* const STATUS_LABELS[STATUS_COUNT] = {"BUSY", "MEETING", "ON CALL", "OPEN TO TALK", "REST", "CUSTOM"};
+const char* const STATUS_LABELS[STATUS_COUNT] = {"AT WORK",  "BUSY",           "IN A MEETING", "ON A CALL",
+                                                 "FOCUSING", "DO NOT DISTURB", "ON A BREAK",   "OUT FOR LUNCH",
+                                                 "SLEEPING", "BACK SOON",      "OPEN TO TALK", "CUSTOM"};
+
+namespace {
+const char* const STATUS_NOTES[STATUS_COUNT] = {"Working hard. Well, mostly.",
+                                                "Swamped! Please come back later.",
+                                                "Talking in a room somewhere.",
+                                                "Phone voice activated.",
+                                                "Headphones on, world off.",
+                                                "Shh... deep in thought.",
+                                                "Coffee first, then everything.",
+                                                "Nom nom. Back after lunch.",
+                                                "Zzz... see you tomorrow!",
+                                                "Just stepped out for a bit.",
+                                                "Come say hi!",
+                                                "Have a lovely day!"};
+}  // namespace
 
 namespace {
 
@@ -311,12 +328,12 @@ void drawFoodSheet(Canvas& c, const UiState& ui, const PetModel& pet, const Butt
 int launcherButtons(int w, int h, Button* out) {
   int n = 0;
   out[n++] = {Box{w - 76, SHEET_TOP + 26, 52, 52}, Act::Close, 0};
-  const int cw = (w - 2 * PAD - 18) / 2, ch = 114;
-  const Act acts[4] = {Act::AppPet, Act::AppPomodoro, Act::AppStatus, Act::AppAnswers};
-  for (int i = 0; i < 4; ++i) {
+  const int cw = (w - 2 * PAD - 18) / 2, ch = 100;
+  const Act acts[6] = {Act::AppPet, Act::AppTodo, Act::AppPomodoro, Act::AppStatus, Act::AppAnswers, Act::ExitToReader};
+  for (int i = 0; i < 6; ++i) {
     out[n++] = {Box{PAD + (i % 2) * (cw + 18), SHEET_TOP + 96 + (i / 2) * (ch + 16), cw, ch}, acts[i], 0};
   }
-  out[n++] = {Box{PAD, h - 92, w - 2 * PAD, 58}, Act::ExitToReader, 0};
+  (void)h;
   return n;
 }
 
@@ -324,23 +341,53 @@ void drawLauncher(Canvas& c, const UiState& ui, const Button* b, int nb) {
   const int w = c.width();
   sheet(c, SHEET_TOP);
   c.text(PAD + 6, SHEET_TOP + 30, "Apps", T_TITLE, true);
-  const Icon icons[4] = {Icon::Pet, Icon::Timer, Icon::Status, Icon::Answers};
-  const char* labels[4] = {"My pet", "Focus timer", "Status board", "Answers"};
   for (int i = 0; i < nb; ++i) {
     const Box& x = b[i].box;
     const bool f = ui.focus == i;
     if (b[i].act == Act::Close) {
       iconButton(c, x, Icon::Close, f);
-    } else if (b[i].act == Act::ExitToReader) {
-      pill(c, x, "Back to my books", f, true);
-    } else {
-      const int k = static_cast<int>(b[i].act) - static_cast<int>(Act::AppPet);
-      card(c, x, f);
-      drawIcon(c, icons[k], x.cx(), x.y + 42, 50);
-      c.textCentered(x.cx(), x.y + 76, labels[k], T_LABEL, true);
+      continue;
     }
+    Icon icon = Icon::Pet;
+    const char* label = "My pet";
+    switch (b[i].act) {
+      case Act::AppTodo:
+        icon = Icon::Status;
+        label = "To-do";
+        break;
+      case Act::AppPomodoro:
+        icon = Icon::Timer;
+        label = "Focus timer";
+        break;
+      case Act::AppStatus:
+        icon = Icon::Status;
+        label = "Status board";
+        break;
+      case Act::AppAnswers:
+        icon = Icon::Answers;
+        label = "Answers";
+        break;
+      case Act::ExitToReader:
+        icon = Icon::Book;
+        label = "My books";
+        break;
+      default:
+        break;
+    }
+    card(c, x, f);
+    if (b[i].act == Act::AppTodo) {  // a little checklist
+      for (int k = 0; k < 3; ++k) {
+        const int y = x.y + 18 + k * 13;
+        c.frame(x.cx() - 22, y, 10, 10, 2, 2, Ink::Black);
+        if (k < 2) c.line(x.cx() - 20, y + 5, x.cx() - 14, y + 8, 2, Ink::Black);
+        c.rect(x.cx() - 6, y + 4, 28, 3, Ink::Black);
+      }
+    } else {
+      drawIcon(c, icon, x.cx(), x.y + 38, 44);
+    }
+    c.textCentered(x.cx(), x.y + 66, label, T_LABEL, true);
   }
-  c.textCentered(w / 2, c.height() - 128, "Shake for Answers  |  Turn sideways for Status", T_SMALL);
+  c.textCentered(w / 2, c.height() - 34, "Shake for Answers  |  Turn sideways for Status", T_SMALL);
 }
 
 // ----------------------------------------------------------- Pomodoro -----
@@ -573,37 +620,122 @@ void drawPomodoro(Canvas& c, const UiState& ui, const PetModel& pet, const Clock
 int statusMenuButtons(int w, int h, Button* out) {
   int n = 0;
   out[n++] = backButton();
-  const int tw = (w - 2 * PAD - 2 * 18) / 3, th = (h - 112 - PAD - 18) / 2;
+  const int cols = 4, gap = 14;
+  const int tw = (w - 2 * PAD - (cols - 1) * gap) / cols, th = (h - 92 - 44 - 2 * gap) / 3;
   for (int i = 0; i < STATUS_COUNT; ++i) {
-    out[n++] = {Box{PAD + (i % 3) * (tw + 18), 100 + (i / 3) * (th + 18), tw, th}, Act::StatusPick, i};
+    out[n++] = {Box{PAD + (i % cols) * (tw + gap), 86 + (i / cols) * (th + gap), tw, th}, Act::StatusPick, i};
   }
   return n;
 }
 
-void statusProp(Canvas& c, int idx, int cx, int cy) {
+void drawLaptop(Canvas& c, int cx, int ground, int s) {
+  // Back of an open laptop lid with a heart sticker, sitting in front of the pet.
+  const int w = s, lh = s * 62 / 100;
+  const Box lid{cx - w / 2, ground - lh - s / 12, w, lh};
+  c.roundRect(lid.x + 5, lid.y + 5, lid.w, lid.h, s / 10, Ink::Black);
+  c.frame(lid.x, lid.y, lid.w, lid.h, s / 10, 4, Ink::Black);
+  c.heart(lid.cx(), lid.cy(), s / 4, Ink::Gray);
+  c.roundRect(cx - w / 2 - s / 10, ground - s / 12, w + s / 5, s / 12, s / 30, Ink::Black);
+}
+
+void drawMug(Canvas& c, int cx, int ground, int s) {
+  const int w = s * 60 / 100, h = s * 64 / 100;
+  c.arc(cx + w / 2, ground - h / 2, s / 6, -80, 80, s / 14, Ink::Black);
+  c.roundRect(cx - w / 2 + 4, ground - h + 4, w, h, s / 8, Ink::Black);
+  c.frame(cx - w / 2, ground - h, w, h, s / 8, 4, Ink::Black);
+  c.heart(cx, ground - h / 2, s / 4, Ink::Gray);
+  for (int i = -1; i <= 1; i += 2) {  // steam
+    const int x = cx + i * s / 7;
+    c.arc(x - s / 14, ground - h - s / 6, s / 12, -90, 90, 3, Ink::Black);
+    c.arc(x + s / 14, ground - h - s / 3, s / 12, 90, 270, 3, Ink::Black);
+  }
+}
+
+void drawPapers(Canvas& c, int cx, int ground, int s) {
+  for (int i = 0; i < 4; ++i) {
+    const int y = ground - (i + 1) * s / 7;
+    const int x = cx - s / 2 + (i % 2 ? s / 14 : -s / 20);
+    c.frame(x, y, s, s / 7 + 3, 4, 3, Ink::Black);
+  }
+  c.frame(cx - s / 2 + 6, ground - 5 * s / 7 - 8, s - 12, s / 7 + 8, 4, 3, Ink::Black);
+  c.rect(cx - s / 3, ground - 5 * s / 7 - 2, s / 2, 3, Ink::Gray);
+}
+
+void drawSign(Canvas& c, int cx, int top, int s, const char* text) {
+  // Little door hanger.
+  c.arc(cx, top + s / 6, s / 6, 180, 360, 4, Ink::Black);
+  const Box b{cx - s / 2, top + s / 6, s, s * 55 / 100};
+  c.roundRect(b.x + 4, b.y + 4, b.w, b.h, s / 8, Ink::Black);
+  c.frame(b.x, b.y, b.w, b.h, s / 8, 4, Ink::Black);
+  c.textCentered(b.cx(), b.y + b.h / 2 - 14, text, 24, true);
+}
+
+void drawSweat(Canvas& c, int x, int y, int s) {
+  Shape drop[2] = {Shape::circle(x, y, s / 2), Shape{}};
+  const int xs[3] = {x - s / 2, x + s / 2, x};
+  const int ys[3] = {y, y, y - s * 13 / 10};
+  drop[1] = Shape::poly(xs, ys, 3);
+  c.outlined(drop, 2, 3, Ink::Gray);
+}
+
+void miniBubbles(Canvas& c, int x, int y, int s) {
+  for (int k = 0; k < 2; ++k) {
+    const int bx = x + k * s * 7 / 10, by = y + k * s * 6 / 10;
+    c.roundRect(bx + 3, by + 3, s, s * 6 / 10, s / 4, Ink::Black);
+    c.frame(bx, by, s, s * 6 / 10, s / 4, 3, Ink::Black, k ? Ink::White : Ink::White);
+    for (int d = -1; d <= 1; ++d) c.circle(bx + s / 2 + d * s / 5, by + s * 3 / 10, s / 14 + 1, Ink::Black);
+  }
+}
+
+// Small picture for each status, used on the menu tiles.
+void statusIcon(Canvas& c, int idx, int cx, int cy, int s) {
   switch (idx) {
     case 0:
-      c.textCentered(cx, cy - 26, "!", 56, true);
+      c.frame(cx - s / 2, cy - s / 2, s, s * 62 / 100, s / 10, 3, Ink::Black);
+      c.heart(cx, cy - s / 5, s / 4, Ink::Gray);
+      c.roundRect(cx - s * 6 / 10, cy + s / 6, s * 12 / 10, s / 7, 3, Ink::Black);
       break;
     case 1:
-      for (int i = -1; i <= 1; ++i) c.circle(cx + i * 18, cy, 7, Ink::Black);
+      c.textCentered(cx - s / 6, cy - s / 2 - 2, "!", s, true);
+      c.textCentered(cx + s / 6, cy - s / 2 - 2, "!", s, true);
       break;
-    case 2: {  // mobile phone with sound waves
-      c.roundRect(cx - 15, cy - 26, 30, 52, 8, Ink::Black);
-      c.roundRect(cx - 10, cy - 19, 20, 32, 3, Ink::White);
-      c.circle(cx, cy + 19, 3, Ink::White);
-      c.arc(cx + 14, cy - 4, 14, -50, 50, 4, Ink::Black);
-      c.arc(cx - 14, cy - 4, 14, 130, 230, 4, Ink::Black);
+    case 2:
+      miniBubbles(c, cx - s * 6 / 10, cy - s / 2, s * 8 / 10);
       break;
-    }
     case 3:
-      c.heart(cx, cy, 44, Ink::Black);
+      c.roundRect(cx - s / 4, cy - s / 2, s / 2, s, s / 8, Ink::Black);
+      c.roundRect(cx - s / 6, cy - s / 3, s / 3, s / 2, 2, Ink::White);
+      c.arc(cx + s / 4, cy - s / 10, s / 4, -50, 50, 3, Ink::Black);
       break;
     case 4:
-      drawIcon(c, Icon::Moon, cx, cy, 46);
+      c.arc(cx, cy + s / 8, s / 2, 190, 350, 5, Ink::Black);
+      c.roundRect(cx - s / 2 - s / 10, cy - s / 10, s / 4, s / 2, s / 10, Ink::Black);
+      c.roundRect(cx + s / 2 - s / 7, cy - s / 10, s / 4, s / 2, s / 10, Ink::Black);
+      break;
+    case 5:
+      c.circle(cx, cy, s / 2, Ink::Black);
+      c.circle(cx, cy, s / 2 - 4, Ink::White);
+      c.roundRect(cx - s / 3, cy - s / 12, s * 2 / 3, s / 6, s / 12, Ink::Black);
+      break;
+    case 6:
+      drawMug(c, cx, cy + s / 2, s);
+      break;
+    case 7:
+      drawFood(c, 5, cx, cy, s);
+      break;
+    case 8:
+      drawIcon(c, Icon::Moon, cx - s / 8, cy, s * 8 / 10);
+      c.textCentered(cx + s / 3, cy - s / 2 - 4, "z", s * 6 / 10, true);
+      break;
+    case 9:
+      drawIcon(c, Icon::Timer, cx, cy, s);
+      break;
+    case 10:
+      c.heart(cx, cy, s, Ink::Black);
+      c.heart(cx, cy, s / 2, Ink::White);
       break;
     default:
-      c.sparkle(cx, cy, 22, Ink::Black);
+      c.sparkle(cx, cy, s / 2, Ink::Black);
       break;
   }
 }
@@ -612,39 +744,146 @@ void drawStatusMenu(Canvas& c, const UiState& ui, const Button* b, int nb) {
   header(c, "Status board", ui.focus == 0);
   for (int i = 1; i < nb; ++i) {
     const Box& x = b[i].box;
-    card(c, x, ui.focus == i);
-    statusProp(c, b[i].arg, x.cx(), x.y + 46);
-    const char* label = b[i].arg == 5 ? ui.customStatus : STATUS_LABELS[b[i].arg];
-    c.textWrapped(x.cx(), x.y + 82, x.w - 20, label, T_LABEL + 2, 4, 2, true);
-    if (b[i].arg == 5) c.textCentered(x.cx(), x.y + x.h - 30, "hold to edit", T_SMALL - 2);
+    const int idx = b[i].arg;
+    card(c, x, ui.focus == i || (idx == ui.status && ui.sinceValid), true, 16);
+    statusIcon(c, idx, x.cx(), x.y + 34, 34);
+    const char* label = idx == STATUS_CUSTOM ? ui.customStatus : STATUS_LABELS[idx];
+    const int lines = c.countLines(x.w - 16, label, T_BODY - 1, 2, true);
+    c.textWrapped(x.cx(), x.y + (lines > 1 ? 58 : 66), x.w - 16, label, T_BODY - 1, 2, 2, true);
+    if (idx == STATUS_CUSTOM) c.textCentered(x.cx(), x.y + x.h - 22, "hold to edit", T_SMALL - 4);
   }
+  c.textCentered(c.width() / 2, c.height() - 34, "Your status stays on screen while the Sticky sleeps", T_SMALL - 1);
 }
 
 void drawStatusFull(Canvas& c, const UiState& ui, const PetModel& pet, const Clock& clk) {
   const int w = c.width(), h = c.height();
-  const char* label = ui.status == 5 ? ui.customStatus : STATUS_LABELS[ui.status];
-  c.frame(10, 10, w - 20, h - 20, 30, 6, Ink::Black);
-  const int textW = w * 58 / 100;
-  const int size = c.textWidth(label, 80, true) > textW - 40 ? 64 : 80;
-  const int lines = c.countLines(textW - 40, label, size, 3, true);
-  c.textWrapped(40 + textW / 2, h / 2 - lines * (size + 10) / 2 - 10, textW - 40, label, size, 10, 3, true);
-  c.textCentered(40 + textW / 2, h - 64, "Tap to change", T_SMALL);
+  const int idx = ui.status;
+  const char* label = idx == STATUS_CUSTOM ? ui.customStatus : STATUS_LABELS[idx];
 
+  // Frame with little decorations around the edge.
+  c.frame(8, 8, w - 16, h - 16, 32, 5, Ink::Black);
+  c.sparkle(40, 44, 10, Ink::Black);
+  c.sparkle(w - 46, 40, 7, Ink::Black);
+  c.heart(w - 80, h - 40, 16, Ink::Gray);
+  c.sparkle(w / 2 + 10, h - 34, 6, Ink::Black);
+  c.heart(w / 2 + 40, 30, 12, Ink::Gray);
+
+  // Big speech bubble from the pet.
+  const Box bub{36, 52, 486, 300};
+  const int tipX = bub.x + bub.w + 52, tipY = bub.y + bub.h - 40;
+  const int tx[3] = {bub.x + bub.w - 30, bub.x + bub.w - 30, tipX};
+  const int ty[3] = {bub.y + bub.h - 110, bub.y + bub.h - 50, tipY};
+  c.roundRect(bub.x + 7, bub.y + 7, bub.w, bub.h, 40, Ink::Gray);
+  c.roundRect(bub.x - 4, bub.y - 4, bub.w + 8, bub.h + 8, 44, Ink::Black);
+  const int ox[3] = {tx[0], tx[1], tx[2] + 8};
+  const int oy[3] = {ty[0] - 6, ty[1] + 6, ty[2] + 2};
+  c.poly(ox, oy, 3, Ink::Black);
+  c.roundRect(bub.x, bub.y, bub.w, bub.h, 40, Ink::White);
+  c.poly(tx, ty, 3, Ink::White);
+
+  int size = 76;
+  while (size > 40 &&
+         (c.countLines(bub.w - 60, label, size, 3, true) > 2 || c.textWidth(label, size, true) > 2 * (bub.w - 60))) {
+    size -= 6;
+  }
+  // A single word wider than the bubble also needs a smaller size.
+  for (const char* p = label; *p;) {
+    char word[24];
+    int n = 0;
+    while (*p == ' ') ++p;
+    while (*p && *p != ' ' && n < 23) word[n++] = *p++;
+    word[n] = 0;
+    while (n && size > 32 && c.textWidth(word, size, true) > bub.w - 50) size -= 4;
+  }
+  const int lines = c.countLines(bub.w - 60, label, size, 2, true);
+  const int blockH = lines * (size + 8) + 34 + (ui.sinceValid ? 44 : 0);
+  int y = bub.cy() - blockH / 2 - 4;
+  c.textWrapped(bub.cx(), y, bub.w - 60, label, size, 8, 2, true);
+  y += lines * (size + 8) + 6;
+  c.textCentered(bub.cx(), y, STATUS_NOTES[idx], T_LABEL);
+  if (ui.sinceValid) {
+    char buf[32];
+    const int hr = ui.sinceHour % 12 == 0 ? 12 : ui.sinceHour % 12;
+    snprintf(buf, sizeof(buf), "since %d:%02d%s", hr, ui.sinceMinute, ui.sinceHour < 12 ? "am" : "pm");
+    const int tw = c.textWidth(buf, T_BODY, true);
+    const Box chip{bub.cx() - tw / 2 - 30, y + 38, tw + 60, 34};
+    c.roundRect(chip.x, chip.y, chip.w, chip.h, 17, Ink::Black);
+    drawIcon(c, Icon::Timer, chip.x + 22, chip.cy(), 16);
+    c.circle(chip.x + 22, chip.cy() + 1, 9, Ink::White);
+    c.line(chip.x + 22, chip.cy() + 1, chip.x + 22, chip.cy() - 4, 2, Ink::Black);
+    c.line(chip.x + 22, chip.cy() + 1, chip.x + 26, chip.cy() + 3, 2, Ink::Black);
+    c.text(chip.x + 40, chip.y + 5, buf, T_BODY, true, Ink::White);
+  }
+
+  // The pet acting it out.
+  const int pcx = w - 140, ground = h - 64;
+  c.rect(w - 270, ground, 230, 4, Ink::Black);
+  for (int i = 0; i < 3; ++i) {
+    const int x = w - 250 + i * 95;
+    c.line(x, ground, x - 5, ground - 9, 3, Ink::Black);
+    c.line(x, ground, x + 4, ground - 11, 3, Ink::Black);
+  }
   PetLook look = lookFor(pet, clk);
   look.hungry = false;
-  look.sleeping = ui.status == 4;
-  look.pose = ui.status == 3 || ui.status == 5 ? Pose::Happy : Pose::Idle;
-  const int pcx = w - 160, ground = h - 70;
-  c.rect(w - 300, ground, 260, 4, Ink::Black);
-  if (pet.s.stage == Stage::Egg)
-    drawEgg(c, pet.s.species, pcx, ground, 200, pet.s.hatchTaps);
-  else
-    drawPet(c, look, pcx, ground, 250);
-  if (ui.status != 4) {
-    c.roundRect(pcx + 34, 40, 96, 80, 26, Ink::Black);
-    c.roundRect(pcx + 38, 44, 88, 72, 22, Ink::White);
-    statusProp(c, ui.status, pcx + 82, 80);
+  look.sleeping = idx == STATUS_SLEEPING;
+  look.pose = Pose::Idle;
+  if (idx == 3 || idx == 6 || idx == 10 || idx == STATUS_CUSTOM) look.pose = Pose::Happy;
+  if (idx == 7) look.pose = Pose::Eating;
+  if (idx == 1) look.pose = Pose::Sad;
+  if (idx == 4) look.wear = PetLook::Headphones;
+  if (idx == STATUS_SLEEPING) look.wear = PetLook::Nightcap;
+  const int psize = 240;
+  if (pet.s.stage == Stage::Egg) {
+    drawEgg(c, pet.s.species, pcx, ground, 190, pet.s.hatchTaps);
+  } else {
+    drawPet(c, look, pcx, ground, psize);
   }
+  const int top = ground - psize * 8 / 10;
+  switch (idx) {
+    case 0:
+      drawLaptop(c, pcx, ground + 2, 120);
+      break;
+    case 1:
+      drawPapers(c, pcx - 100, ground, 60);
+      drawSweat(c, pcx + 66, top + 40, 16);
+      break;
+    case 2:
+      miniBubbles(c, pcx + 30, top - 40, 48);
+      break;
+    case 3:
+      statusIcon(c, 3, pcx + 92, top + 30, 50);
+      break;
+    case 5:
+      drawSign(c, pcx + 96, top - 30, 70, "Shh!");
+      break;
+    case 6:
+      drawMug(c, pcx - 96, ground, 66);
+      break;
+    case 7:
+      drawFood(c, 5, pcx - 100, ground - 30, 58);
+      break;
+    case STATUS_SLEEPING:
+      drawIcon(c, Icon::Moon, pcx - 100, top - 10, 44);
+      c.sparkle(pcx - 60, top - 44, 8, Ink::Black);
+      c.sparkle(pcx + 100, top + 70, 6, Ink::Black);
+      break;
+    case 9:
+      statusIcon(c, 9, pcx + 98, top + 4, 46);
+      c.textCentered(pcx + 98, top - 60, "brb!", T_LABEL, true);
+      break;
+    case 10:
+      c.heart(pcx + 86, top + 20, 36, Ink::Black);
+      c.heart(pcx + 112, top - 14, 20, Ink::Gray);
+      c.heart(pcx - 96, top + 40, 22, Ink::Gray);
+      break;
+    case STATUS_CUSTOM:
+      c.sparkle(pcx + 92, top + 10, 16, Ink::Black);
+      c.sparkle(pcx - 94, top + 50, 10, Ink::Black);
+      break;
+    default:
+      break;
+  }
+  c.text(36, h - 50, "Tap to change", T_SMALL, true);
 }
 
 // ---------------------------------------------------- Book of Answers -----
@@ -656,9 +895,8 @@ int answersButtons(const UiState& ui, int w, int h, Button* out) {
     out[n++] = {Box{PAD, h - 110, w - 2 * PAD, 70}, Act::AnsAgain, 0};
     return n;
   }
-  const int sw = (w - 2 * PAD - 12) / 2;
-  out[n++] = {Box{PAD, 92, sw, 56}, Act::AnsMode, 0};
-  out[n++] = {Box{PAD + sw + 12, 92, sw, 56}, Act::AnsMode, 1};
+  const int sw = (w - 2 * PAD - 2 * 10) / 3;
+  for (int i = 0; i < 3; ++i) out[n++] = {Box{PAD + i * (sw + 10), 92, sw, 52}, Act::AnsMode, i};
   out[n++] = {Box{w / 2 - 150, 190, 300, 300}, Act::AnsHold, 0};
   return n;
 }
@@ -700,8 +938,19 @@ void drawCrystal(Canvas& c, int cx, int cy, int s) {
 void drawAnswers(Canvas& c, const UiState& ui, const Button* b, int nb) {
   const int w = c.width(), h = c.height();
   header(c, "Book of Answers", ui.focus == 0);
+  if (ui.ans == AnsPhase::Result && ui.ansMode == 2) {
+    drawTarotCard(c, ui.answer, ui.reversed, w / 2, 290, 380);
+    c.textCentered(w / 2, 500, tarotName(ui.answer), T_TITLE + 2, true);
+    const char* way = ui.reversed ? "Reversed" : "Upright";
+    const int tw = c.textWidth(way, T_SMALL, true);
+    c.roundRect(w / 2 - tw / 2 - 16, 546, tw + 32, 30, 15, Ink::Black);
+    c.textCentered(w / 2, 550, way, T_SMALL, true, Ink::White);
+    c.textWrapped(w / 2, 592, w - 2 * PAD - 30, tarotMeaning(ui.answer, ui.reversed), T_LABEL + 2, 8, 3);
+    for (int i = 1; i < nb; ++i) pill(c, b[i].box, "Draw again", ui.focus == i, true);
+    return;
+  }
   if (ui.ans == AnsPhase::Result) {
-    if (ui.yesNo) {
+    if (ui.ansMode == 1) {
       drawCrystal(c, w / 2, 300, 300);
       c.textCentered(w / 2, 470, yesNoText(ui.answer), 80, true);
     } else {
@@ -715,20 +964,25 @@ void drawAnswers(Canvas& c, const UiState& ui, const Button* b, int nb) {
   for (int i = 1; i < nb; ++i) {
     const Box& x = b[i].box;
     if (b[i].act == Act::AnsMode) {
-      const bool on = (b[i].arg == 1) == ui.yesNo;
-      if (on) {
+      static const char* const MODES[3] = {"MESSAGE", "YES / NO", "TAROT"};
+      if (b[i].arg == ui.ansMode) {
         c.roundRect(x.x, x.y, x.w, x.h, x.h / 2, Ink::Black);
-        c.textCentered(x.cx(), x.y + 14, b[i].arg ? "YES OR NO" : "MESSAGE", T_BODY, true, Ink::White);
+        c.textCentered(x.cx(), x.y + 14, MODES[b[i].arg], T_SMALL + 1, true, Ink::White);
       } else {
         c.frame(x.x, x.y, x.w, x.h, x.h / 2, ui.focus == i ? 5 : 3, Ink::Black);
-        c.textCentered(x.cx(), x.y + 14, b[i].arg ? "YES OR NO" : "MESSAGE", T_BODY, true);
+        c.textCentered(x.cx(), x.y + 14, MODES[b[i].arg], T_SMALL + 1, true);
       }
     } else if (b[i].act == Act::AnsHold) {
       if (ui.focus == i) focusMarks(c, x);
-      if (ui.yesNo)
+      if (ui.ansMode == 1) {
         drawCrystal(c, x.cx(), x.cy(), 280);
-      else
+      } else if (ui.ansMode == 2) {  // a small fanned deck
+        drawTarotBack(c, x.cx() - 70, x.cy() + 14, 230);
+        drawTarotBack(c, x.cx() + 70, x.cy() + 14, 230);
+        drawTarotBack(c, x.cx(), x.cy(), 260);
+      } else {
         drawBook(c, x.cx(), x.cy(), 270, false);
+      }
     }
   }
   const char* msg;
@@ -739,8 +993,10 @@ void drawAnswers(Canvas& c, const UiState& ui, const Button* b, int nb) {
   } else if (ui.ans == AnsPhase::Retry) {
     msg = ui.hasImu ? "Shake a little longer! Keep going for three seconds." : "Hold a little longer!";
   } else {
-    msg = ui.hasImu ? "Hold a question in your mind, then shake me for three seconds."
-                    : "Hold a question in your mind, then press and hold the book.";
+    msg = ui.ansMode == 2 ? (ui.hasImu ? "Think of your question, then shake for three seconds to shuffle the deck."
+                                       : "Think of your question, then press and hold the deck to shuffle.")
+          : ui.hasImu     ? "Hold a question in your mind, then shake me for three seconds."
+                          : "Hold a question in your mind, then press and hold the book.";
   }
   c.textWrapped(w / 2, 540, w - 2 * PAD - 40, msg, T_LABEL, 8, 3, ui.ans == AnsPhase::Thinking);
   if (ui.shakePct > 0 && ui.ans != AnsPhase::Thinking) {
@@ -780,8 +1036,8 @@ void drawGuide(Canvas& c, const UiState& ui, const PetModel& pet, const Button* 
       "meals cost more reading but fill your pet up more.",
       "Egg, Baby, Child, Teen, Adult. As a teen it becomes a Foodie, Cuddly, Active or Bookworm, "
       "depending on how you cared for it. Care every day to build a streak.",
-      "Open Apps for a focus timer, a status board for your desk, and the Book of Answers. Finished focus "
-      "sessions count as care too.",
+      "Open Apps for a to-do list from Todoist, a focus timer, a status board for your desk, and the Book "
+      "of Answers with tarot. Ticked tasks and finished focus sessions count as care.",
       "Tap to choose. Up and Down move, OK selects, swipe from the edge to go back. In Apps, shake for "
       "Answers or turn the Sticky sideways for the Status board.",
   };
@@ -859,20 +1115,23 @@ void drawGuide(Canvas& c, const UiState& ui, const PetModel& pet, const Button* 
 int settingsButtons(int w, Button* out) {
   int n = 0;
   out[n++] = backButton();
-  const Act acts[5] = {Act::SetRename, Act::SetSound, Act::SetCollection, Act::SetGuide, Act::SetNewPet};
-  for (int i = 0; i < 5; ++i) out[n++] = {Box{PAD, 100 + i * 94, w - 2 * PAD, 78}, acts[i], 0};
+  const Act acts[7] = {Act::SetRename,     Act::SetSound, Act::SetChatter, Act::SetAddQuote,
+                       Act::SetCollection, Act::SetGuide, Act::SetNewPet};
+  for (int i = 0; i < 7; ++i) out[n++] = {Box{PAD, 92 + i * 82, w - 2 * PAD, 68}, acts[i], 0};
   return n;
 }
 
 void drawSettings(Canvas& c, const UiState& ui, const PetModel& pet, const Button* b, int nb) {
   header(c, "Settings", ui.focus == 0);
-  const Icon icons[5] = {Icon::Pet, pet.s.soundOn ? Icon::Sound : Icon::Mute, Icon::Star, Icon::Help, Icon::Leaf};
+  const Icon icons[7] = {
+      Icon::Pet, pet.s.soundOn ? Icon::Sound : Icon::Mute, Icon::Book, Icon::Heart, Icon::Star, Icon::Help, Icon::Leaf};
   for (int i = 1; i < nb; ++i) {
     const Box& x = b[i].box;
     card(c, x, ui.focus == i);
     drawIcon(c, icons[i - 1], x.x + 40, x.cy(), 34);
     const char* label = "";
     const char* value = "";
+    char countBuf[16];
     switch (b[i].act) {
       case Act::SetRename:
         label = "Name";
@@ -881,6 +1140,18 @@ void drawSettings(Canvas& c, const UiState& ui, const PetModel& pet, const Butto
       case Act::SetSound:
         label = "Sounds";
         value = pet.s.soundOn ? "On" : "Off";
+        break;
+      case Act::SetChatter:
+        label = "Pet talk";
+        value = pet.s.chatterOn && pet.s.quotesOn ? "All three"
+                : pet.s.quotesOn                  ? "+ my quotes"
+                : pet.s.chatterOn                 ? "+ book chatter"
+                                                  : "Pet only";
+        break;
+      case Act::SetAddQuote:
+        label = "Add a quote";
+        snprintf(countBuf, sizeof countBuf, "%d saved", ui.quoteCount);
+        value = countBuf;
         break;
       case Act::SetCollection:
         label = "Keepsakes & stats";
@@ -897,7 +1168,7 @@ void drawSettings(Canvas& c, const UiState& ui, const PetModel& pet, const Butto
     c.text(x.x + 80, x.cy() - 14, label, T_LABEL, true);
     if (*value) c.text(x.x + x.w - 24 - c.textWidth(value, T_LABEL), x.cy() - 14, value, T_LABEL);
   }
-  c.textCentered(c.width() / 2, c.height() - 60, "Pocket Pets for CrossPoint", T_SMALL);
+  c.textCentered(c.width() / 2, c.height() - 46, "Quotes live in pocketpets/quotes.txt, one per line", T_SMALL);
 }
 
 void drawCollection(Canvas& c, const UiState& ui, const PetModel& pet, const Clock& clk) {
@@ -974,6 +1245,292 @@ void drawAdopt(Canvas& c, const UiState& ui, const Button* b, int nb) {
 
 }  // namespace
 
+// ---------------------------------------------------------------- To-do ----
+
+namespace {
+
+// Calendar date for a day number (inverse of the day count used for Clock::day).
+void civilFromDays(int32_t z, int& y, int& m, int& d) {
+  z += 719468;
+  const int era = (z >= 0 ? z : z - 146096) / 146097;
+  const int doe = z - era * 146097;
+  const int yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  const int doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  const int mp = (5 * doy + 2) / 153;
+  d = doy - (153 * mp + 2) / 5 + 1;
+  m = mp + (mp < 10 ? 3 : -9);
+  y = yoe + era * 400 + (m <= 2);
+}
+
+void dueLabel(const char* due, const Clock& clk, char* buf, int len) {
+  buf[0] = 0;
+  if (!due[0]) return;
+  int y = 0, m = 0, d = 0;
+  if (sscanf(due, "%d-%d-%d", &y, &m, &d) != 3) return;
+  if (clk.valid) {
+    int ty, tm, td;
+    civilFromDays(clk.day, ty, tm, td);
+    const long dueKey = y * 400L + m * 32 + d, todayKey = ty * 400L + tm * 32 + td;
+    int ny, nm, nd;
+    civilFromDays(clk.day + 1, ny, nm, nd);
+    if (dueKey < todayKey) {
+      snprintf(buf, len, "Overdue");
+      return;
+    }
+    if (dueKey == todayKey) {
+      snprintf(buf, len, "Today");
+      return;
+    }
+    if (dueKey == ny * 400L + nm * 32 + nd) {
+      snprintf(buf, len, "Tomorrow");
+      return;
+    }
+  }
+  static const char* const MON[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  snprintf(buf, len, "%s %d", MON[(m + 11) % 12], d);
+}
+
+// Bubble beside a small pet, tail pointing left.
+void sideBubble(Canvas& c, const Box& b, const char* text) {
+  c.roundRect(b.x + 5, b.y + 5, b.w, b.h, 20, Ink::Gray);
+  c.roundRect(b.x - 3, b.y - 3, b.w + 6, b.h + 6, 23, Ink::Black);
+  const int ox[3] = {b.x + 4, b.x + 4, b.x - 24};
+  const int oy[3] = {b.y + b.h / 2 - 16, b.y + b.h / 2 + 12, b.y + b.h / 2 + 10};
+  c.poly(ox, oy, 3, Ink::Black);
+  c.roundRect(b.x, b.y, b.w, b.h, 20, Ink::White);
+  const int ix[3] = {b.x + 6, b.x + 6, b.x - 16};
+  const int iy[3] = {b.y + b.h / 2 - 11, b.y + b.h / 2 + 8, b.y + b.h / 2 + 7};
+  c.poly(ix, iy, 3, Ink::White);
+  const int n = c.countLines(b.w - 28, text, T_BODY, 2);
+  c.textWrapped(b.cx(), b.cy() - (n * (T_BODY + 5)) / 2 - 3, b.w - 28, text, T_BODY, 5, 2);
+}
+
+constexpr int TODO_TOP = 226, TODO_ROW = 84;
+
+int todoButtons(const UiState& ui, int w, int h, Button* out) {
+  int n = 0;
+  out[n++] = backButton();
+  out[n++] = {Box{w - 134, 16, 52, 52}, Act::TodoSync, 0};
+  out[n++] = {Box{w - 72, 16, 52, 52}, Act::TodoOpenSettings, 0};
+  const TodoList* t = ui.todo;
+  if (!t) return n;
+  const int first = ui.todoPage * TODO_PER_PAGE;
+  for (int i = first; i < t->count && i < first + TODO_PER_PAGE; ++i) {
+    out[n++] = {Box{PAD - 6, TODO_TOP + (i - first) * TODO_ROW, w - 2 * PAD + 12, TODO_ROW - 8}, Act::TodoToggle, i};
+  }
+  if (t->count > TODO_PER_PAGE) {
+    if (ui.todoPage > 0) out[n++] = {Box{PAD, h - 66, 64, 48}, Act::TodoPrev, 0};
+    if (first + TODO_PER_PAGE < t->count) out[n++] = {Box{w - PAD - 64, h - 66, 64, 48}, Act::TodoNext, 0};
+  }
+  return n;
+}
+
+void drawSyncIcon(Canvas& c, int cx, int cy, int s) {
+  c.arc(cx, cy, s / 2, 200, 340, s / 7, Ink::Black);
+  c.arc(cx, cy, s / 2, 20, 160, s / 7, Ink::Black);
+  const int a = s / 4;
+  const int xs[3] = {cx + s / 2 - a, cx + s / 2 + a, cx + s / 2};
+  const int ys[3] = {cy - a / 2, cy - a / 2, cy + a / 2 + 2};
+  c.poly(xs, ys, 3, Ink::Black);
+  const int xs2[3] = {cx - s / 2 - a, cx - s / 2 + a, cx - s / 2};
+  const int ys2[3] = {cy + a / 2, cy + a / 2, cy - a / 2 - 2};
+  c.poly(xs2, ys2, 3, Ink::Black);
+}
+
+void drawTodo(Canvas& c, const UiState& ui, const PetModel& pet, const Clock& clk, const Button* b, int nb) {
+  const int w = c.width(), h = c.height();
+  header(c, "To-do", ui.focus == 0);
+  const TodoList* t = ui.todo;
+  for (int i = 1; i < nb; ++i) {
+    if (b[i].act == Act::TodoSync) {
+      iconButton(c, b[i].box, Icon::None, ui.focus == i);
+      drawSyncIcon(c, b[i].box.cx(), b[i].box.cy(), 24);
+    }
+    if (b[i].act == Act::TodoOpenSettings) iconButton(c, b[i].box, Icon::Gear, ui.focus == i);
+  }
+
+  // The pet cheers you on.
+  PetLook look = lookFor(pet, clk);
+  look.sleeping = false;
+  const int left = t ? t->remaining() : 0;
+  look.pose = t && t->count > 0 && left == 0 ? Pose::Excited : Pose::Idle;
+  look.hungry = false;
+  if (pet.s.stage == Stage::Egg)
+    drawEgg(c, pet.s.species, 76, 206, 110, pet.s.hatchTaps);
+  else
+    drawPet(c, look, 78, 206, 150);
+  char msg[96];
+  if (ui.syncing)
+    snprintf(msg, sizeof msg, "Syncing with Todoist...");
+  else if (!t || !t->hasToken())
+    snprintf(msg, sizeof msg, "Add your Todoist token in settings!");
+  else if (t->lastError[0])
+    snprintf(msg, sizeof msg, "%s", t->lastError);
+  else if (t->count == 0)
+    snprintf(msg, sizeof msg, "Nothing to do. Enjoy your day!");
+  else if (left == 0)
+    snprintf(msg, sizeof msg, "All done! You're amazing!");
+  else if (left == 1)
+    snprintf(msg, sizeof msg, "Just one left. You've got this!");
+  else
+    snprintf(msg, sizeof msg, "%d to go. One at a time!", left);
+  sideBubble(c, Box{164, 100, w - 164 - PAD, 84}, msg);
+  c.rect(PAD, 214, w - 2 * PAD, 3, Ink::Black);
+
+  if (t) {
+    char due[16];
+    for (int i = 1; i < nb; ++i) {
+      if (b[i].act != Act::TodoToggle) continue;
+      const TodoItem& it = t->items[b[i].arg];
+      const Box& x = b[i].box;
+      if (ui.focus == i) focusMarks(c, x);
+      // Checkbox.
+      const Box cb{x.x + 8, x.y + 14, 38, 38};
+      c.roundRect(cb.x + 3, cb.y + 3, cb.w, cb.h, 10, Ink::Black);
+      if (it.done) {
+        c.roundRect(cb.x, cb.y, cb.w, cb.h, 10, Ink::Black);
+        c.line(cb.x + 9, cb.y + 20, cb.x + 16, cb.y + 28, 5, Ink::White);
+        c.line(cb.x + 16, cb.y + 28, cb.x + 30, cb.y + 10, 5, Ink::White);
+      } else {
+        c.frame(cb.x, cb.y, cb.w, cb.h, 10, 3, Ink::Black);
+        if (it.priority >= 3) c.roundRect(cb.x + 7, cb.y + 7, cb.w - 14, cb.h - 14, 6, Ink::Gray);
+      }
+      // Text and due date.
+      const int tx = x.x + 62, tw = x.w - 62 - 8;
+      const int lines = c.countLines(tw, it.text, T_BODY, 2, !it.done);
+      int dx = x.x + 62;
+      // Left-aligned wrap: draw centred lines then shift is complex; use one or two lines by width.
+      (void)lines;
+      char first[96];
+      snprintf(first, sizeof first, "%s", it.text);
+      if (c.textWidth(first, T_BODY, !it.done) > tw) {
+        int cut = static_cast<int>(strlen(first));
+        while (cut > 0 && c.textWidth(first, T_BODY, !it.done) > tw - c.textWidth("...", T_BODY)) {
+          --cut;
+          while (cut > 0 && first[cut] != ' ') --cut;
+          first[cut] = 0;
+        }
+        if (cut == 0) snprintf(first, sizeof first, "%.24s", it.text);
+        strncat(first, "...", sizeof(first) - strlen(first) - 1);
+      }
+      c.text(tx, x.y + 10, first, T_BODY, !it.done);
+      if (it.done) c.rect(tx, x.y + 22, c.textWidth(first, T_BODY), 3, Ink::Black);
+      dueLabel(it.due, clk, due, sizeof due);
+      if (due[0]) {
+        const bool late = strcmp(due, "Overdue") == 0;
+        const int dw = c.textWidth(due, T_SMALL - 2, true) + 20;
+        if (late) {
+          c.roundRect(dx, x.y + 42, dw, 26, 13, Ink::Black);
+          c.text(dx + 10, x.y + 45, due, T_SMALL - 2, true, Ink::White);
+        } else {
+          c.frame(dx, x.y + 42, dw, 26, 13, 2, Ink::Black);
+          c.text(dx + 10, x.y + 45, due, T_SMALL - 2, true);
+        }
+        dx += dw + 10;
+      }
+      if (it.priority >= 2 && !it.done) {
+        const char* bang = it.priority >= 4 ? "!!!" : it.priority == 3 ? "!!" : "!";
+        c.text(dx, x.y + 42, bang, T_BODY, true);
+      }
+      c.rect(x.x + 62, x.y + x.h + 3, x.w - 70, 1, Ink::Gray);
+    }
+    if (t->hasToken() && t->count == 0 && !ui.syncing) {
+      c.sparkle(w / 2, 400, 26, Ink::Black);
+      c.sparkle(w / 2 + 50, 370, 10, Ink::Black);
+      c.textCentered(w / 2, 450, "All clear!", T_TITLE, true);
+    }
+  }
+
+  for (int i = 1; i < nb; ++i) {
+    if (b[i].act == Act::TodoPrev) pill(c, b[i].box, "<", ui.focus == i);
+    if (b[i].act == Act::TodoNext) pill(c, b[i].box, ">", ui.focus == i);
+  }
+  char foot[64];
+  foot[0] = 0;
+  if (t && t->lastSync > 1 && clk.valid) {
+    // Local time of the last sync, using the clock's offset from UTC.
+    int64_t offset = (clk.hour * 3600 + clk.minute * 60) - (clk.epoch % 86400);
+    if (offset > 14 * 3600) offset -= 86400;
+    if (offset < -12 * 3600) offset += 86400;
+    const int64_t local = t->lastSync + offset;
+    const int sod = static_cast<int>(((local % 86400) + 86400) % 86400);
+    const int hh = sod / 3600, mm = sod / 60 % 60;
+    const bool today = (local / 86400) == ((clk.epoch + offset) / 86400);
+    snprintf(foot, sizeof foot, "Synced %s%d:%02d%s", today ? "" : "yesterday ", hh % 12 == 0 ? 12 : hh % 12, mm,
+             hh < 12 ? "am" : "pm");
+  } else if (t && t->hasToken()) {
+    snprintf(foot, sizeof foot, "Not synced yet");
+  }
+  if (foot[0]) c.textCentered(w / 2, h - 52, foot, T_SMALL);
+}
+
+int todoSettingsButtons(int w, Button* out) {
+  int n = 0;
+  out[n++] = backButton();
+  out[n++] = {Box{PAD, 96, w - 2 * PAD, 74}, Act::TodoSetToken, 0};
+  out[n++] = {Box{PAD, 184, w - 2 * PAD, 74}, Act::TodoSetFilter, 0};
+  out[n++] = {Box{PAD, 272, w - 2 * PAD, 74}, Act::TodoSetSchedule, 0};
+  out[n++] = {Box{w - PAD - 150, 372, 64, 56}, Act::TodoHourDown, 0};
+  out[n++] = {Box{w - PAD - 70, 372, 64, 56}, Act::TodoHourUp, 0};
+  out[n++] = {Box{PAD, 460, w - 2 * PAD, 66}, Act::TodoSync, 0};
+  return n;
+}
+
+void drawTodoSettings(Canvas& c, const UiState& ui, const Button* b, int nb) {
+  const int w = c.width();
+  header(c, "To-do settings", ui.focus == 0);
+  const TodoList* t = ui.todo;
+  char buf[48];
+  for (int i = 1; i < nb; ++i) {
+    const Box& x = b[i].box;
+    const bool f = ui.focus == i;
+    const char* label = nullptr;
+    const char* value = "";
+    switch (b[i].act) {
+      case Act::TodoSetToken:
+        label = "Todoist token";
+        value = t && t->hasToken() ? "Set" : "Not set";
+        break;
+      case Act::TodoSetFilter:
+        label = "Show";
+        snprintf(buf, sizeof buf, "%.20s%s", t ? t->filter : "", t && strlen(t->filter) > 20 ? "..." : "");
+        value = buf;
+        break;
+      case Act::TodoSetSchedule:
+        label = "Sync";
+        value = t ? TodoList::scheduleName(t->schedule, t->dailyHour, buf, sizeof buf) : "";
+        break;
+      case Act::TodoHourDown:
+        pill(c, x, "-", f);
+        break;
+      case Act::TodoHourUp:
+        pill(c, x, "+", f);
+        break;
+      case Act::TodoSync:
+        pill(c, x, "Sync now", f, true);
+        break;
+      default:
+        break;
+    }
+    if (label) {
+      card(c, x, f);
+      c.text(x.x + 24, x.cy() - 14, label, T_LABEL, true);
+      c.text(x.x + x.w - 24 - c.textWidth(value, T_LABEL), x.cy() - 14, value, T_LABEL);
+    }
+  }
+  const bool daily = t && t->schedule == SyncSchedule::Daily;
+  c.text(PAD + 4, 386, daily ? "Sync time" : "Sync time (daily only)", T_LABEL, daily);
+  c.textWrapped(w / 2, 560, w - 2 * PAD - 10,
+                "Get your token in Todoist: Settings, Integrations, Developer. Type it in above, or save it as "
+                "todoist.txt on the SD card. Show takes a Todoist filter, like: today | overdue",
+                T_SMALL, 7, 7);
+  c.textWrapped(w / 2, 720, w - 2 * PAD - 10,
+                "The list syncs when you open it and when the Sticky goes to sleep after the sync time.", T_SMALL - 1,
+                5, 3);
+}
+
+}  // namespace
+
 const char* bannerTitle(Event e) {
   switch (e) {
     case Event::Hatched:
@@ -1023,6 +1580,10 @@ int layout(const UiState& ui, const PetModel& pet, const Clock& clk, int w, int 
       return 1;
     case Screen::ConfirmNew:
       return confirmButtons(w, h, out);
+    case Screen::Todo:
+      return todoButtons(ui, w, h, out);
+    case Screen::TodoSettings:
+      return todoSettingsButtons(w, out);
   }
   return 0;
 }
@@ -1134,6 +1695,12 @@ void drawScreen(Canvas& c, const UiState& ui, const PetModel& pet, const Clock& 
       break;
     case Screen::ConfirmNew:
       drawConfirm(c, ui, pet, clk, b);
+      break;
+    case Screen::Todo:
+      drawTodo(c, ui, pet, clk, b, nb);
+      break;
+    case Screen::TodoSettings:
+      drawTodoSettings(c, ui, b, nb);
       break;
   }
   if (ui.screen == Screen::Home && ui.banner != Event::None && bannerTitle(ui.banner)[0]) {

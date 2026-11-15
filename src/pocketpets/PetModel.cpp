@@ -181,10 +181,14 @@ void PetModel::adopt(Species sp, const char* name, const Clock& c) {
   const uint32_t seed = s.rng ^ static_cast<uint32_t>(c.epoch) ^ 0xA5A5u;
   const bool sound = s.soundOn;
   const bool guide = s.guideSeen;
+  const bool chatter = s.chatterOn;
+  const bool quotes = s.quotesOn;
   s = PetState{};
   s.rng = seed ? seed : 1;
   s.soundOn = sound;
   s.guideSeen = guide;
+  s.chatterOn = chatter;
+  s.quotesOn = quotes;
   s.adopted = true;
   s.species = sp;
   snprintf(s.name, sizeof(s.name), "%s", (name && *name) ? name : defaultName(sp));
@@ -404,6 +408,13 @@ void PetModel::pomodoroDone(const Clock& c) {
   ++s.pomodoros;
   if (s.stage >= Stage::Child) ++s.evRead;
   care(2, 1, c);
+}
+
+void PetModel::taskDone(const Clock& c) {
+  if (!s.adopted || s.stage == Stage::Egg) return;
+  if (s.stage >= Stage::Child) ++s.evPlay;
+  lastPose = Pose::Happy;
+  care(1, 1, c);
 }
 
 int PetModel::stageProgressPct() const {
