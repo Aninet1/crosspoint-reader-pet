@@ -24,6 +24,7 @@ class HalTiltSensor {
   bool _tiltBackEvent = false;     // Consumed by wasTiltedBack()
   bool _hadActivity = false;       // Non-consuming flag for sleep timer
   bool _inTilt = false;            // Currently tilted past threshold
+  bool _motionHold = false;        // An app is reading motion; keep the IMU awake
   bool _isAwake = false;           // Tracks power state
   unsigned long _initMs = 0;       // Timestamp of sensor init
   unsigned long _lastTiltMs = 0;   // Debounce / cooldown
@@ -70,4 +71,9 @@ class HalTiltSensor {
 
   // Discard any pending tilt events (call when leaving reader or disabling tilt).
   void clearPendingEvents();
+
+  // Keeps the IMU awake outside the reader for apps that read motion
+  // directly (shake and rotation gestures). update() leaves it alone meanwhile.
+  void setMotionHold(bool hold);
+  bool readSample(Imu::Sample& out);
 };

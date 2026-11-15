@@ -46,6 +46,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "platform/UsbSerialJtagHandoff.h"
+#include "pocketpets/PetStore.h"
 #include "util/ButtonNavigator.h"
 #include "util/PluginEvents.h"
 #include "util/ScreenshotUtil.h"
@@ -449,6 +450,20 @@ static bool holdSleepWhileUsbPowered() {
 }
 #endif
 
+// Pocket Pets: time spent with a book open and in use feeds the pet. A pause
+// longer than five minutes without input stops counting until the next page.
+static void creditReadingTime() {
+  static unsigned long lastTick = millis();
+  const unsigned long now = millis();
+  unsigned long dt = now - lastTick;
+  lastTick = now;
+  if (dt > 5000) dt = 5000;  // slow iterations (refresh, SD) can't inflate credit
+  constexpr unsigned long kReadingIdleMs = 5UL * 60UL * 1000UL;
+  if (activityManager.isForegroundReader() && now - lastInputTime < kReadingIdleMs) {
+    PET_STORE.addReadingMs(static_cast<uint32_t>(dt));
+  }
+}
+
 // Enter deep sleep mode
 void enterDeepSleep(bool fromTimeout = false) {
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
@@ -457,6 +472,7 @@ void enterDeepSleep(bool fromTimeout = false) {
   // Sleep may end in a power-off (battery death, latch); persist the clock
   // floor now so a later cold boot resumes from it.
   trustedtime::note();
+  PET_STORE.flush();
 
   // Stop Bluetooth before plugin delivery can start WiFi; a timeout defers delivery.
   deepSleepInProgress = true;
@@ -651,6 +667,7 @@ void setup() {
   // UTC-offset setting on first boot after the update).
   timezones::applyToClock();
   RECENT_BOOKS.loadFromFile();
+  PET_STORE.loadFromFile();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();
@@ -922,6 +939,7 @@ void loop() {
   const bool userInput = gpio.wasAnyPressed() || gpio.wasAnyReleased() || gpio.wasTouchActivity() ||
                          halTiltSensor.hadActivity() || remoteActed;
   if (userInput) lastInputTime = millis();
+  creditReadingTime();
   idleDisplayWhileAwake();
   if (userInput || activityManager.preventAutoSleep()) {
     lastActivityTime = millis();         // Reset inactivity timer

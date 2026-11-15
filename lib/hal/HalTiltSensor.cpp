@@ -67,8 +67,24 @@ bool HalTiltSensor::deepSleep() {
   return true;
 }
 
+void HalTiltSensor::setMotionHold(const bool hold) {
+  if (!_available || hold == _motionHold) return;
+  _motionHold = hold;
+  if (hold && !_isAwake) {
+    _isAwake = wake();
+  }
+  // Releasing leaves the IMU as is: update() puts it back to sleep when tilt
+  // page turn is off.
+}
+
+bool HalTiltSensor::readSample(Imu::Sample& out) {
+  if (!_available || !_isAwake) return false;
+  if ((millis() - _wakeMs) < WAKE_STABILIZE_MS) return false;
+  return _sdkImu.read(out);
+}
+
 void HalTiltSensor::update(const uint8_t mode, const uint8_t orientation, const bool inReader) {
-  if (!_available) {
+  if (!_available || _motionHold) {
     return;
   }
 

@@ -23,6 +23,7 @@
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
+#include "activities/pocketpets/PocketPetsActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -34,6 +35,7 @@ int HomeActivity::getMenuItemCount() const {
   if (slotItem() != HomeMenuItem::NONE) {
     count++;
   }
+  if (showPets()) count++;
   return count;
 }
 
@@ -258,7 +260,8 @@ void HomeActivity::onEnter() {
   }
 
   const auto base = static_cast<int>(recentBooks.size());
-  selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem, slotItem());
+  selectorIndex =
+      initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem, slotItem(), showPets());
 
   // Trigger first update
   requestUpdate();
@@ -320,7 +323,7 @@ void HomeActivity::loop() {
       return;
     }
     const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());
-    switch (indexToMenuItem(menuIndex, slotItem())) {
+    switch (indexToMenuItem(menuIndex, slotItem(), showPets())) {
       case HomeMenuItem::FILE_BROWSER:
         onFileBrowserOpen();
         break;
@@ -332,6 +335,9 @@ void HomeActivity::loop() {
         break;
       case HomeMenuItem::OPDS_BROWSER:
         onOpdsBrowserOpen();
+        break;
+      case HomeMenuItem::POCKET_PETS:
+        onPocketPetsOpen();
         break;
       case HomeMenuItem::FILE_TRANSFER:
         onFileTransferOpen();
@@ -557,6 +563,12 @@ void HomeActivity::render(RenderLock&&) {
     menuItems.insert(menuItems.begin() + 2, hasPlugins ? tr(STR_PLUGINS) : tr(STR_OPDS_BROWSER));
     menuIcons.insert(menuIcons.begin() + 2, hasPlugins ? Plugins : Book);
   }
+  if (showPets()) {
+    // Personal fork: an English label rather than a translated string.
+    const int petsAt = slotItem() != HomeMenuItem::NONE ? 3 : 2;
+    menuItems.insert(menuItems.begin() + petsAt, "Pocket Pets");
+    menuIcons.insert(menuIcons.begin() + petsAt, Blocks);
+  }
 
   if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
     // Insert Continue Reading at the top if enabled in theme
@@ -603,3 +615,12 @@ void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }
 
 void HomeActivity::onPluginsOpen() { activityManager.goToPlugins(); }
+
+void HomeActivity::onPocketPetsOpen() {
+  auto activity = makeUniqueNoThrow<PocketPetsActivity>(renderer, mappedInput);
+  if (!activity) {
+    LOG_ERR("HOME", "OOM: pocket pets");
+    return;
+  }
+  activityManager.replaceActivity(std::move(activity));
+}

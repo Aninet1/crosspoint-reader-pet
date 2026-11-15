@@ -44,8 +44,11 @@ class HomeActivity final : public Activity {
   const HomeMenuItem initialMenuItem;
   const bool cleanInitialRefresh;
 
+  // Pocket Pets sits in the list menu; the cover-grid tab bar keeps its fixed tabs.
+  bool showPets() const { return !coverGridUi; }
+
   // Convert HomeMenuItem to menu index (used in onEnter)
-  static int menuItemToIndex(HomeMenuItem item, HomeMenuItem slot) {
+  static int menuItemToIndex(HomeMenuItem item, HomeMenuItem slot, bool pets) {
     int i = 0;
     if (item == HomeMenuItem::FILE_BROWSER) return i;
     ++i;
@@ -54,6 +57,8 @@ class HomeActivity final : public Activity {
     if (slot != HomeMenuItem::NONE && item == slot) return i;
     if (item == HomeMenuItem::PLUGINS) return 0;
     if (slot != HomeMenuItem::NONE) ++i;
+    if (item == HomeMenuItem::POCKET_PETS) return pets ? i : 0;
+    if (pets) ++i;
     // File Transfer also opens the OPDS browser, so it returns there without its slot.
     if (item == HomeMenuItem::FILE_TRANSFER || item == HomeMenuItem::OPDS_BROWSER) return i;
     ++i;
@@ -62,11 +67,12 @@ class HomeActivity final : public Activity {
   }
 
   // Convert menu index to HomeMenuItem (used in loop)
-  static HomeMenuItem indexToMenuItem(int idx, HomeMenuItem slot) {
+  static HomeMenuItem indexToMenuItem(int idx, HomeMenuItem slot, bool pets) {
     int i = 0;
     if (idx == i++) return HomeMenuItem::FILE_BROWSER;
     if (idx == i++) return HomeMenuItem::LIBRARY;
     if (slot != HomeMenuItem::NONE && idx == i++) return slot;
+    if (pets && idx == i++) return HomeMenuItem::POCKET_PETS;
     if (idx == i++) return HomeMenuItem::FILE_TRANSFER;
     if (idx == i) return HomeMenuItem::SETTINGS_MENU;
     return HomeMenuItem::NONE;
@@ -78,6 +84,7 @@ class HomeActivity final : public Activity {
   void onFileTransferOpen();
   void onOpdsBrowserOpen();
   void onPluginsOpen();
+  void onPocketPetsOpen();
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image
