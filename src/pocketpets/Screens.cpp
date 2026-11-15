@@ -1570,7 +1570,8 @@ int todoSettingsButtons(int w, Button* out) {
   out[n++] = {Box{PAD, 272, w - 2 * PAD, 74}, Act::TodoSetSchedule, 0};
   out[n++] = {Box{w - PAD - 150, 372, 64, 56}, Act::TodoHourDown, 0};
   out[n++] = {Box{w - PAD - 70, 372, 64, 56}, Act::TodoHourUp, 0};
-  out[n++] = {Box{PAD, 460, w - 2 * PAD, 66}, Act::TodoSync, 0};
+  out[n++] = {Box{PAD, 444, w - 2 * PAD, 66}, Act::TodoHomeCard, 0};
+  out[n++] = {Box{PAD, 528, w - 2 * PAD, 62}, Act::TodoSync, 0};
   return n;
 }
 
@@ -1607,6 +1608,10 @@ void drawTodoSettings(Canvas& c, const UiState& ui, const Button* b, int nb) {
       case Act::TodoSync:
         pill(c, x, "Sync now", f, true);
         break;
+      case Act::TodoHomeCard:
+        label = "Show on home screen";
+        value = t && t->homeCard ? "On" : "Off";
+        break;
       default:
         break;
     }
@@ -1618,11 +1623,11 @@ void drawTodoSettings(Canvas& c, const UiState& ui, const Button* b, int nb) {
   }
   const bool daily = t && t->schedule == SyncSchedule::Daily;
   c.text(PAD + 4, 386, daily ? "Sync time" : "Sync time (daily only)", T_LABEL, daily);
-  c.textWrapped(w / 2, 560, w - 2 * PAD - 10,
+  c.textWrapped(w / 2, 612, w - 2 * PAD - 10,
                 "Get your token in Todoist: Settings, Integrations, Developer. Type it in above, or save it as "
                 "todoist.txt on the SD card. Show takes a Todoist filter, like: today | overdue",
                 T_SMALL, 7, 7);
-  c.textWrapped(w / 2, 720, w - 2 * PAD - 10,
+  c.textWrapped(w / 2, 736, w - 2 * PAD - 10,
                 "The list syncs when you open it and when the Sticky goes to sleep after the sync time.", T_SMALL - 1,
                 5, 3);
 }

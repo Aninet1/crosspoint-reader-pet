@@ -128,6 +128,7 @@ void TodoStore::toJson(JsonDocument& doc) const {
   doc["hour"] = list.dailyHour;
   doc["lastSync"] = list.lastSync;
   doc["error"] = list.lastError;
+  doc["homeCard"] = list.homeCard;
   JsonArray items = doc["items"].to<JsonArray>();
   for (int i = 0; i < list.count; ++i) {
     const pp::TodoItem& t = list.items[i];
@@ -152,6 +153,7 @@ bool TodoStore::fromJson(JsonVariantConst doc) {
   if (l.dailyHour > 23) l.dailyHour = 7;
   l.lastSync = doc["lastSync"] | static_cast<int64_t>(0);
   strncpy(l.lastError, doc["error"] | "", sizeof(l.lastError) - 1);
+  l.homeCard = doc["homeCard"] | true;
   for (JsonVariantConst o : doc["items"].as<JsonArrayConst>()) {
     if (l.count >= pp::TodoList::MAX_ITEMS) break;
     pp::TodoItem& t = l.items[l.count++];

@@ -601,7 +601,7 @@ void HomeActivity::render(RenderLock&&) {
                     rows * (GUI.getMenuRowHeight(renderer) + metrics.menuSpacing) + 2;
     // Touch boards draw no button hints, so the card can use the full height.
     const int bottom = pageHeight - (mappedInput.hasTouch() ? 6 : metrics.buttonHintsHeight + 6);
-    if (bottom - top >= pp::HOME_TODO_MIN_HEIGHT) {
+    if (TODO_STORE.list.homeCard && bottom - top >= pp::HOME_TODO_MIN_HEIGHT) {
       todoX = content.x + metrics.contentSidePadding;
       todoW = content.width - 2 * metrics.contentSidePadding - 4;
       todoY = top;

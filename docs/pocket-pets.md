@@ -5,7 +5,9 @@ spend reading. On CrossPoint's list home, the space under Settings shows a
 to-do card with your pet peeking in: tap the pet to open Pocket Pets, the
 header to open the to-do list, or a box to tick a task. With the keys, move past
 Settings to select the card. If a layout has no room for the card, Pocket Pets
-appears as a last menu row instead. (The cover-grid layout keeps its fixed tabs.)
+appears as a last menu row instead. Turn the card off under To-do settings →
+**Show on home screen** to get the plain row back. (The cover-grid layout keeps
+its fixed tabs.)
 
 ## The pet
 

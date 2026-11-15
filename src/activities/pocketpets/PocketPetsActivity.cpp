@@ -684,6 +684,12 @@ void PocketPetsActivity::act(const Button& b) {
     case Act::TodoSync:
       requestTodoSync();
       break;
+    case Act::TodoHomeCard: {
+      RenderLock lock;
+      TODO_STORE.list.homeCard = !TODO_STORE.list.homeCard;
+    }
+      TODO_STORE.saveToFile();
+      break;
     case Act::TodoOpenSettings:
       go(Screen::TodoSettings);
       return;

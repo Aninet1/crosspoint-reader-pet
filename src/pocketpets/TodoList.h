@@ -32,6 +32,7 @@ struct TodoList {
   uint8_t dailyHour = 7;
   int64_t lastSync = 0;  // epoch of the last good sync, 0 = never
   char lastError[48] = "";
+  bool homeCard = true;  // show the card under CrossPoint's home menu
 
   bool hasToken() const { return token[0] != 0; }
   int remaining() const;

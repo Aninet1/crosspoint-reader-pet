@@ -55,6 +55,7 @@ enum class Act : uint8_t {
   TodoSetSchedule,
   TodoHourDown,
   TodoHourUp,
+  TodoHomeCard,
   PomoPreset,
   PomoCustom,
   PomoKey,
