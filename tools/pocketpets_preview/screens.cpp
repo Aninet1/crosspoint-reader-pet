@@ -169,6 +169,12 @@ int main(int argc, char** argv) {
       TodoList none;
       drawHomeTodo(hc, Box{22, 310, 432, 160}, none, pet, clk);
       hs.writePgm("/tmp/pp_55_home_card.pgm");
+      // Card at the size it gets under a five-row menu on the Sticky (y 676 to 794).
+      HostSurface hs2(480, 800);
+      Canvas hc2(hs2);
+      hc2.clear();
+      drawHomeTodo(hc2, Box{24, 676, 428, 118}, todo, pet, clk);
+      hs2.writePgm("/tmp/pp_56_home_card_fit.pgm");
     }
     TodoList empty;
     t.todo = &empty;

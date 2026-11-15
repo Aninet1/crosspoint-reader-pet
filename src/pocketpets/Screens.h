@@ -162,9 +162,12 @@ void drawScreen(Canvas& c, const UiState& ui, const PetModel& pet, const Clock& 
 inline bool isLandscape(Screen s) { return s == Screen::StatusMenu || s == Screen::StatusFull; }
 
 // To-do card for the empty space under CrossPoint's home menu.
-constexpr int HOME_TODO_MIN_HEIGHT = 130;
-void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetModel& pet, const Clock& clk);
-// What a tap at (x, y) hit: an item index, -1 for the header (open the app), -2 for nothing.
+// The card is also the way into Pocket Pets: the pet in its corner opens it.
+constexpr int HOME_TODO_MIN_HEIGHT = 96;
+void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetModel& pet, const Clock& clk,
+                  bool focused = false);
+constexpr int HOME_TODO_HIT_NONE = -3, HOME_TODO_HIT_PET = -2, HOME_TODO_HIT_TODO = -1;
+// What a tap at (x, y) hit: an item index, or one of the HOME_TODO_HIT_ values.
 int homeTodoHit(const Box& area, const TodoList& list, int x, int y);
 
 // Text for a celebration banner (empty when the event has none).

@@ -1632,7 +1632,7 @@ void drawTodoSettings(Canvas& c, const UiState& ui, const Button* b, int nb) {
 // ------------------------------------------------- Home-screen to-do card ----
 
 namespace {
-constexpr int HT_HEAD = 50, HT_ROW = 42, HT_PAD = 14;
+constexpr int HT_HEAD = 38, HT_ROW = 34, HT_PAD = 12, HT_PET_W = 96;
 
 // Items shown on the card: open ones first, then ticked ones.
 int homeTodoOrder(const TodoList& l, int* out, int max) {
@@ -1646,19 +1646,20 @@ int homeTodoOrder(const TodoList& l, int* out, int max) {
 }
 
 int homeTodoRowCount(const Box& area) {
-  const int rows = (area.h - HT_HEAD - HT_PAD) / HT_ROW;
+  const int rows = (area.h - HT_HEAD - 6) / HT_ROW;
   return rows < 0 ? 0 : rows;
 }
 }  // namespace
 
-void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetModel& pet, const Clock& clk) {
+void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetModel& pet, const Clock& clk,
+                  bool focused) {
   if (area.h < HOME_TODO_MIN_HEIGHT) return;
   const Box& b = area;
   c.roundRect(b.x + 4, b.y + 4, b.w, b.h, 18, Ink::Black);
-  c.frame(b.x, b.y, b.w, b.h, 18, 3, Ink::Black);
+  c.frame(b.x, b.y, b.w, b.h, 18, focused ? 6 : 3, Ink::Black);
 
-  // Header: title, count, and the pet peeking in.
-  c.text(b.x + HT_PAD + 2, b.y + 12, "To-do", T_LABEL, true);
+  // Header: title, count, and the pet peeking in (tap it for Pocket Pets).
+  c.text(b.x + HT_PAD + 2, b.y + 7, "To-do", T_LABEL, true);
   char buf[48];
   const int left = list.remaining();
   if (!list.hasToken())
@@ -1669,7 +1670,7 @@ void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetMod
     snprintf(buf, sizeof buf, "all done!");
   else
     snprintf(buf, sizeof buf, "%d left", left);
-  c.text(b.x + HT_PAD + 2 + c.textWidth("To-do", T_LABEL, true) + 12, b.y + 15, buf, T_SMALL);
+  c.text(b.x + HT_PAD + 2 + c.textWidth("To-do", T_LABEL, true) + 12, b.y + 10, buf, T_SMALL);
   if (pet.s.adopted) {
     PetLook l;
     l.species = pet.s.species;
@@ -1685,7 +1686,7 @@ void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetMod
 
   if (!list.hasToken() || list.count == 0) {
     const char* msg = !list.hasToken() ? "Apps > To-do > settings to connect Todoist" : "Nothing due. Enjoy your day!";
-    c.textWrapped(b.cx(), b.y + HT_HEAD + 14, b.w - 2 * HT_PAD, msg, T_SMALL, 4, 2);
+    c.textWrapped(b.cx(), b.y + HT_HEAD + 10, b.w - 2 * HT_PAD, msg, T_SMALL, 4, 2);
     return;
   }
 
@@ -1695,12 +1696,12 @@ void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetMod
   char due[16];
   for (int k = 0; k < n; ++k) {
     const TodoItem& it = list.items[order[k]];
-    const int y = b.y + HT_HEAD + 8 + k * HT_ROW;
-    const Box cb{b.x + HT_PAD + 2, y + 6, 26, 26};
+    const int y = b.y + HT_HEAD + 3 + k * HT_ROW;
+    const Box cb{b.x + HT_PAD + 2, y + 5, 22, 22};
     if (it.done) {
       c.roundRect(cb.x, cb.y, cb.w, cb.h, 7, Ink::Black);
-      c.line(cb.x + 6, cb.y + 13, cb.x + 11, cb.y + 19, 4, Ink::White);
-      c.line(cb.x + 11, cb.y + 19, cb.x + 20, cb.y + 7, 4, Ink::White);
+      c.line(cb.x + 5, cb.y + 12, cb.x + 10, cb.y + 17, 4, Ink::White);
+      c.line(cb.x + 10, cb.y + 17, cb.x + 18, cb.y + 6, 4, Ink::White);
     } else {
       c.frame(cb.x, cb.y, cb.w, cb.h, 7, 3, Ink::Black);
     }
@@ -1711,11 +1712,11 @@ void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetMod
       const int dw = c.textWidth(due, T_SMALL - 3, true) + 16;
       const bool late = due[0] == 'O';
       if (late) {
-        c.roundRect(right - dw, y + 9, dw, 22, 11, Ink::Black);
-        c.text(right - dw + 8, y + 11, due, T_SMALL - 3, true, Ink::White);
+        c.roundRect(right - dw, y + 5, dw, 22, 11, Ink::Black);
+        c.text(right - dw + 8, y + 7, due, T_SMALL - 3, true, Ink::White);
       } else {
-        c.frame(right - dw, y + 9, dw, 22, 11, 2, Ink::Black);
-        c.text(right - dw + 8, y + 11, due, T_SMALL - 3, true);
+        c.frame(right - dw, y + 5, dw, 22, 11, 2, Ink::Black);
+        c.text(right - dw + 8, y + 7, due, T_SMALL - 3, true);
       }
       right -= dw + 8;
     }
@@ -1727,24 +1728,25 @@ void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetMod
       while (cut > 0 && c.textWidth(text, T_BODY - 1) > tw - c.textWidth("...", T_BODY - 1)) text[--cut] = 0;
       strncat(text, "...", sizeof(text) - strlen(text) - 1);
     }
-    c.text(tx, y + 8, text, T_BODY - 1, false);
-    if (it.done) c.rect(tx, y + 19, c.textWidth(text, T_BODY - 1), 2, Ink::Black);
+    c.text(tx, y + 4, text, T_BODY - 1, false);
+    if (it.done) c.rect(tx, y + 15, c.textWidth(text, T_BODY - 1), 2, Ink::Black);
   }
   const int hidden = list.count - n;
   if (hidden > 0 && n > 0) {
     snprintf(buf, sizeof buf, "+%d more", hidden);
-    c.text(b.x + b.w - HT_PAD - c.textWidth(buf, T_SMALL - 3) - 70, b.y + 19, buf, T_SMALL - 3);
+    c.text(b.x + b.w - HT_PET_W - c.textWidth(buf, T_SMALL - 3), b.y + 13, buf, T_SMALL - 3);
   }
 }
 
 int homeTodoHit(const Box& area, const TodoList& list, int x, int y) {
-  if (area.h < HOME_TODO_MIN_HEIGHT || !area.contains(x, y)) return -2;
-  if (y < area.y + HT_HEAD || !list.hasToken() || list.count == 0) return -1;
+  if (area.h < HOME_TODO_MIN_HEIGHT || !area.contains(x, y)) return HOME_TODO_HIT_NONE;
+  if (y < area.y + HT_HEAD) return x >= area.x + area.w - HT_PET_W ? HOME_TODO_HIT_PET : HOME_TODO_HIT_TODO;
+  if (!list.hasToken() || list.count == 0) return HOME_TODO_HIT_TODO;
   int order[TodoList::MAX_ITEMS];
   const int rows = homeTodoRowCount(area);
   const int n = homeTodoOrder(list, order, rows < TodoList::MAX_ITEMS ? rows : TodoList::MAX_ITEMS);
-  const int k = (y - area.y - HT_HEAD - 8) / HT_ROW;
-  return k >= 0 && k < n ? order[k] : -1;
+  const int k = (y - area.y - HT_HEAD - 3) / HT_ROW;
+  return k >= 0 && k < n ? order[k] : HOME_TODO_HIT_TODO;
 }
 
 const char* bannerTitle(Event e) {

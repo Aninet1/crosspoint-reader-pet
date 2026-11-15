@@ -1,8 +1,11 @@
 # Pocket Pets (personal fork)
 
 A virtual pet for CrossPoint on the reTerminal Sticky, fed by the time you
-spend reading. Open it from **Home → Pocket Pets** (list home layouts; the
-cover-grid layout keeps its fixed tabs).
+spend reading. On CrossPoint's list home, the space under Settings shows a
+to-do card with your pet peeking in: tap the pet to open Pocket Pets, the
+header to open the to-do list, or a box to tick a task. With the keys, move past
+Settings to select the card. If a layout has no room for the card, Pocket Pets
+appears as a last menu row instead. (The cover-grid layout keeps its fixed tabs.)
 
 ## The pet
 
@@ -52,10 +55,8 @@ and *All three*. The pet's own lines are always there.
 
 Open **Apps** on the pet screen.
 
-- **To-do on the home screen:** the list layout of CrossPoint's home shows a
-  to-do card in the space under the menu: open tasks first, with Today and
-  Overdue tags. Tap a box to tick it (sent to Todoist at the next sync), or tap
-  the title to open the full list.
+- **To-do on the home screen:** the card under the home menu lists open tasks
+  first, with Today and Overdue tags. Ticks are sent to Todoist at the next sync.
 - **To-do:** your Todoist tasks (default filter `today | overdue`). Set the
   token under To-do → settings, or save it as `todoist.txt` at the root of the
   SD card. Sync daily at a chosen hour or every 1, 3, 6 or 12 hours: the list

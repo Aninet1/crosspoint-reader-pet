@@ -49,7 +49,8 @@ class HomeActivity final : public Activity {
   // To-do card in the free space under the list menu (empty when it doesn't fit).
   int todoX = 0, todoY = 0, todoW = 0, todoH = 0;
 
-  // Convert HomeMenuItem to menu index (used in onEnter)
+  // Convert HomeMenuItem to menu index (used in onEnter). Pocket Pets comes
+  // last: the to-do card under the menu, or a plain row when the card doesn't fit.
   static int menuItemToIndex(HomeMenuItem item, HomeMenuItem slot, bool pets) {
     int i = 0;
     if (item == HomeMenuItem::FILE_BROWSER) return i;
@@ -59,12 +60,12 @@ class HomeActivity final : public Activity {
     if (slot != HomeMenuItem::NONE && item == slot) return i;
     if (item == HomeMenuItem::PLUGINS) return 0;
     if (slot != HomeMenuItem::NONE) ++i;
-    if (item == HomeMenuItem::POCKET_PETS) return pets ? i : 0;
-    if (pets) ++i;
     // File Transfer also opens the OPDS browser, so it returns there without its slot.
     if (item == HomeMenuItem::FILE_TRANSFER || item == HomeMenuItem::OPDS_BROWSER) return i;
     ++i;
     if (item == HomeMenuItem::SETTINGS_MENU) return i;
+    ++i;
+    if (item == HomeMenuItem::POCKET_PETS) return pets ? i : 0;
     return 0;
   }
 
@@ -74,9 +75,9 @@ class HomeActivity final : public Activity {
     if (idx == i++) return HomeMenuItem::FILE_BROWSER;
     if (idx == i++) return HomeMenuItem::LIBRARY;
     if (slot != HomeMenuItem::NONE && idx == i++) return slot;
-    if (pets && idx == i++) return HomeMenuItem::POCKET_PETS;
     if (idx == i++) return HomeMenuItem::FILE_TRANSFER;
-    if (idx == i) return HomeMenuItem::SETTINGS_MENU;
+    if (idx == i++) return HomeMenuItem::SETTINGS_MENU;
+    if (pets && idx == i) return HomeMenuItem::POCKET_PETS;
     return HomeMenuItem::NONE;
   }
   void onRecentBookSelected(const std::string& path);

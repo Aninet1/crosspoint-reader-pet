@@ -460,7 +460,9 @@ void HomeActivity::loop() {
     if (mappedInput.wasScreenTapped(tx, ty) && area.contains(tx, ty)) {
       const int hit = pp::homeTodoHit(area, TODO_STORE.list, tx, ty);
       haptic_feedback::touchAction();
-      if (hit >= 0) {
+      if (hit == pp::HOME_TODO_HIT_PET) {
+        onPocketPetsOpen(false);
+      } else if (hit >= 0) {
         bool nowDone;
         {
           RenderLock lock;
@@ -589,11 +591,25 @@ void HomeActivity::render(RenderLock&&) {
     menuItems.insert(menuItems.begin() + 2, hasPlugins ? tr(STR_PLUGINS) : tr(STR_OPDS_BROWSER));
     menuIcons.insert(menuIcons.begin() + 2, hasPlugins ? Plugins : Book);
   }
+  // Pocket Pets: a to-do card in the space under the menu, or a last row when
+  // that space is too small. Personal fork: English label, not a translated string.
+  todoH = 0;
   if (showPets()) {
-    // Personal fork: an English label rather than a translated string.
-    const int petsAt = slotItem() != HomeMenuItem::NONE ? 3 : 2;
-    menuItems.insert(menuItems.begin() + petsAt, "Pocket Pets");
-    menuIcons.insert(menuIcons.begin() + petsAt, Blocks);
+    const int rows =
+        static_cast<int>(menuItems.size()) + (metrics.homeContinueReadingInMenu && !recentBooks.empty() ? 1 : 0);
+    const int top = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset +
+                    rows * (GUI.getMenuRowHeight(renderer) + metrics.menuSpacing) + 2;
+    // Touch boards draw no button hints, so the card can use the full height.
+    const int bottom = pageHeight - (mappedInput.hasTouch() ? 6 : metrics.buttonHintsHeight + 6);
+    if (bottom - top >= pp::HOME_TODO_MIN_HEIGHT) {
+      todoX = content.x + metrics.contentSidePadding;
+      todoW = content.width - 2 * metrics.contentSidePadding - 4;
+      todoY = top;
+      todoH = bottom - top;
+    } else {
+      menuItems.push_back("Pocket Pets");
+      menuIcons.push_back(Blocks);
+    }
   }
 
   if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
@@ -612,22 +628,12 @@ void HomeActivity::render(RenderLock&&) {
       [&menuItems](int index) { return std::string(menuItems[index]); },
       [&menuIcons](int index) { return menuIcons[index]; });
 
-  // Pocket Pets to-do card in the space left under the menu.
-  todoH = 0;
-  if (showPets()) {
-    const int rows = static_cast<int>(menuItems.size());
-    const int top = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset +
-                    rows * (GUI.getMenuRowHeight(renderer) + metrics.menuSpacing) + 14;
-    const int bottom = pageHeight - metrics.buttonHintsHeight - 14;
-    if (bottom - top >= pp::HOME_TODO_MIN_HEIGHT) {
-      todoX = content.x + metrics.contentSidePadding;
-      todoW = content.width - 2 * metrics.contentSidePadding - 4;
-      todoY = top;
-      todoH = bottom - top;
-      pp::DeviceSurface surface(renderer);
-      pp::Canvas canvas(surface);
-      pp::drawHomeTodo(canvas, pp::Box{todoX, todoY, todoW, todoH}, TODO_STORE.list, PET_STORE.model, PetStore::now());
-    }
+  if (todoH > 0) {
+    pp::DeviceSurface surface(renderer);
+    pp::Canvas canvas(surface);
+    const bool focused = selectorIndex == getMenuItemCount() - 1;
+    pp::drawHomeTodo(canvas, pp::Box{todoX, todoY, todoW, todoH}, TODO_STORE.list, PET_STORE.model, PetStore::now(),
+                     focused);
   }
 
   const auto labels = mappedInput.mapLabels(recentBooks.empty() ? "" : tr(STR_RESUME), tr(STR_SELECT), tr(STR_DIR_UP),
