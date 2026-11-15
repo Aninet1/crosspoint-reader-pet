@@ -161,6 +161,12 @@ void drawScreen(Canvas& c, const UiState& ui, const PetModel& pet, const Clock& 
 // Screens that are laid out in landscape.
 inline bool isLandscape(Screen s) { return s == Screen::StatusMenu || s == Screen::StatusFull; }
 
+// To-do card for the empty space under CrossPoint's home menu.
+constexpr int HOME_TODO_MIN_HEIGHT = 130;
+void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetModel& pet, const Clock& clk);
+// What a tap at (x, y) hit: an item index, -1 for the header (open the app), -2 for nothing.
+int homeTodoHit(const Box& area, const TodoList& list, int x, int y);
+
 // Text for a celebration banner (empty when the event has none).
 const char* bannerTitle(Event e);
 

@@ -1629,6 +1629,124 @@ void drawTodoSettings(Canvas& c, const UiState& ui, const Button* b, int nb) {
 
 }  // namespace
 
+// ------------------------------------------------- Home-screen to-do card ----
+
+namespace {
+constexpr int HT_HEAD = 50, HT_ROW = 42, HT_PAD = 14;
+
+// Items shown on the card: open ones first, then ticked ones.
+int homeTodoOrder(const TodoList& l, int* out, int max) {
+  int n = 0;
+  for (int pass = 0; pass < 2; ++pass) {
+    for (int i = 0; i < l.count && n < max; ++i) {
+      if (l.items[i].done == (pass == 1)) out[n++] = i;
+    }
+  }
+  return n;
+}
+
+int homeTodoRowCount(const Box& area) {
+  const int rows = (area.h - HT_HEAD - HT_PAD) / HT_ROW;
+  return rows < 0 ? 0 : rows;
+}
+}  // namespace
+
+void drawHomeTodo(Canvas& c, const Box& area, const TodoList& list, const PetModel& pet, const Clock& clk) {
+  if (area.h < HOME_TODO_MIN_HEIGHT) return;
+  const Box& b = area;
+  c.roundRect(b.x + 4, b.y + 4, b.w, b.h, 18, Ink::Black);
+  c.frame(b.x, b.y, b.w, b.h, 18, 3, Ink::Black);
+
+  // Header: title, count, and the pet peeking in.
+  c.text(b.x + HT_PAD + 2, b.y + 12, "To-do", T_LABEL, true);
+  char buf[48];
+  const int left = list.remaining();
+  if (!list.hasToken())
+    snprintf(buf, sizeof buf, "set up in Pocket Pets");
+  else if (list.count == 0)
+    snprintf(buf, sizeof buf, "all clear!");
+  else if (left == 0)
+    snprintf(buf, sizeof buf, "all done!");
+  else
+    snprintf(buf, sizeof buf, "%d left", left);
+  c.text(b.x + HT_PAD + 2 + c.textWidth("To-do", T_LABEL, true) + 12, b.y + 15, buf, T_SMALL);
+  if (pet.s.adopted) {
+    PetLook l;
+    l.species = pet.s.species;
+    l.stage = pet.s.stage == Stage::Egg ? Stage::Baby : pet.s.stage;
+    l.personality = pet.s.personality;
+    l.pose = list.count > 0 && left == 0 ? Pose::Excited : Pose::Idle;
+    if (pet.s.stage == Stage::Egg)
+      drawEgg(c, pet.s.species, b.x + b.w - 44, b.y + HT_HEAD - 4, 50, pet.s.hatchTaps);
+    else
+      drawPet(c, l, b.x + b.w - 46, b.y + HT_HEAD - 4, 64);
+  }
+  c.rect(b.x + HT_PAD, b.y + HT_HEAD, b.w - 2 * HT_PAD, 2, Ink::Black);
+
+  if (!list.hasToken() || list.count == 0) {
+    const char* msg = !list.hasToken() ? "Apps > To-do > settings to connect Todoist" : "Nothing due. Enjoy your day!";
+    c.textWrapped(b.cx(), b.y + HT_HEAD + 14, b.w - 2 * HT_PAD, msg, T_SMALL, 4, 2);
+    return;
+  }
+
+  int order[TodoList::MAX_ITEMS];
+  const int rows = homeTodoRowCount(b);
+  const int n = homeTodoOrder(list, order, rows < TodoList::MAX_ITEMS ? rows : TodoList::MAX_ITEMS);
+  char due[16];
+  for (int k = 0; k < n; ++k) {
+    const TodoItem& it = list.items[order[k]];
+    const int y = b.y + HT_HEAD + 8 + k * HT_ROW;
+    const Box cb{b.x + HT_PAD + 2, y + 6, 26, 26};
+    if (it.done) {
+      c.roundRect(cb.x, cb.y, cb.w, cb.h, 7, Ink::Black);
+      c.line(cb.x + 6, cb.y + 13, cb.x + 11, cb.y + 19, 4, Ink::White);
+      c.line(cb.x + 11, cb.y + 19, cb.x + 20, cb.y + 7, 4, Ink::White);
+    } else {
+      c.frame(cb.x, cb.y, cb.w, cb.h, 7, 3, Ink::Black);
+    }
+    // Due tag on the right, then the text truncated to what's left.
+    int right = b.x + b.w - HT_PAD;
+    dueLabel(it.due, clk, due, sizeof due);
+    if (due[0] && !it.done && (strcmp(due, "Today") == 0 || strcmp(due, "Overdue") == 0)) {
+      const int dw = c.textWidth(due, T_SMALL - 3, true) + 16;
+      const bool late = due[0] == 'O';
+      if (late) {
+        c.roundRect(right - dw, y + 9, dw, 22, 11, Ink::Black);
+        c.text(right - dw + 8, y + 11, due, T_SMALL - 3, true, Ink::White);
+      } else {
+        c.frame(right - dw, y + 9, dw, 22, 11, 2, Ink::Black);
+        c.text(right - dw + 8, y + 11, due, T_SMALL - 3, true);
+      }
+      right -= dw + 8;
+    }
+    const int tx = cb.x + cb.w + 12, tw = right - tx;
+    char text[96];
+    snprintf(text, sizeof text, "%s", it.text);
+    if (c.textWidth(text, T_BODY - 1) > tw) {
+      size_t cut = strlen(text);
+      while (cut > 0 && c.textWidth(text, T_BODY - 1) > tw - c.textWidth("...", T_BODY - 1)) text[--cut] = 0;
+      strncat(text, "...", sizeof(text) - strlen(text) - 1);
+    }
+    c.text(tx, y + 8, text, T_BODY - 1, false);
+    if (it.done) c.rect(tx, y + 19, c.textWidth(text, T_BODY - 1), 2, Ink::Black);
+  }
+  const int hidden = list.count - n;
+  if (hidden > 0 && n > 0) {
+    snprintf(buf, sizeof buf, "+%d more", hidden);
+    c.text(b.x + b.w - HT_PAD - c.textWidth(buf, T_SMALL - 3) - 70, b.y + 19, buf, T_SMALL - 3);
+  }
+}
+
+int homeTodoHit(const Box& area, const TodoList& list, int x, int y) {
+  if (area.h < HOME_TODO_MIN_HEIGHT || !area.contains(x, y)) return -2;
+  if (y < area.y + HT_HEAD || !list.hasToken() || list.count == 0) return -1;
+  int order[TodoList::MAX_ITEMS];
+  const int rows = homeTodoRowCount(area);
+  const int n = homeTodoOrder(list, order, rows < TodoList::MAX_ITEMS ? rows : TodoList::MAX_ITEMS);
+  const int k = (y - area.y - HT_HEAD - 8) / HT_ROW;
+  return k >= 0 && k < n ? order[k] : -1;
+}
+
 const char* bannerTitle(Event e) {
   switch (e) {
     case Event::Hatched:

@@ -52,6 +52,10 @@ and *All three*. The pet's own lines are always there.
 
 Open **Apps** on the pet screen.
 
+- **To-do on the home screen:** the list layout of CrossPoint's home shows a
+  to-do card in the space under the menu: open tasks first, with Today and
+  Overdue tags. Tap a box to tick it (sent to Todoist at the next sync), or tap
+  the title to open the full list.
 - **To-do:** your Todoist tasks (default filter `today | overdue`). Set the
   token under To-do → settings, or save it as `todoist.txt` at the root of the
   SD card. Sync daily at a chosen hour or every 1, 3, 6 or 12 hours: the list

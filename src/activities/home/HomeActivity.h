@@ -46,6 +46,8 @@ class HomeActivity final : public Activity {
 
   // Pocket Pets sits in the list menu; the cover-grid tab bar keeps its fixed tabs.
   bool showPets() const { return !coverGridUi; }
+  // To-do card in the free space under the list menu (empty when it doesn't fit).
+  int todoX = 0, todoY = 0, todoW = 0, todoH = 0;
 
   // Convert HomeMenuItem to menu index (used in onEnter)
   static int menuItemToIndex(HomeMenuItem item, HomeMenuItem slot, bool pets) {
@@ -84,7 +86,7 @@ class HomeActivity final : public Activity {
   void onFileTransferOpen();
   void onOpdsBrowserOpen();
   void onPluginsOpen();
-  void onPocketPetsOpen();
+  void onPocketPetsOpen(bool toTodo = false);
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image

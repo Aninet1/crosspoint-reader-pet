@@ -160,6 +160,16 @@ int main(int argc, char** argv) {
     shot("51_todo_p2", t, pet, clk);
     t.screen = Screen::TodoSettings;
     shot("52_todo_settings", t, pet, clk);
+    {
+      // The card under CrossPoint's home menu, at two heights.
+      HostSurface hs(480, 520);
+      Canvas hc(hs);
+      hc.clear();
+      drawHomeTodo(hc, Box{22, 10, 432, 270}, todo, pet, clk);
+      TodoList none;
+      drawHomeTodo(hc, Box{22, 310, 432, 160}, none, pet, clk);
+      hs.writePgm("/tmp/pp_55_home_card.pgm");
+    }
     TodoList empty;
     t.todo = &empty;
     t.screen = Screen::Todo;

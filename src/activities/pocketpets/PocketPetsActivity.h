@@ -9,8 +9,8 @@
 
 class PocketPetsActivity final : public Activity {
  public:
-  PocketPetsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-      : Activity("PocketPets", renderer, mappedInput) {}
+  PocketPetsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, bool openTodo = false)
+      : Activity("PocketPets", renderer, mappedInput), openTodo(openTodo) {}
 
   void onEnter() override;
   void onExit() override;
@@ -23,6 +23,7 @@ class PocketPetsActivity final : public Activity {
 
  private:
   pp::UiState ui;
+  bool openTodo = false;  // opened from the home-screen to-do card
   pp::Button buttons[pp::MAX_BUTTONS];
   int buttonCount = 0;
 
