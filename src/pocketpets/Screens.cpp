@@ -1144,11 +1144,11 @@ void drawGuide(Canvas& c, const UiState& ui, const PetModel& pet, const Button* 
   l.species = pet.s.species;
   switch (p) {
     case 0:
-      for (int i = 0; i < 4; ++i) {
+      for (int i = 0; i < 5; ++i) {
         l.species = static_cast<Species>(i);
         l.stage = Stage::Baby;
         l.pose = i % 2 ? Pose::Happy : Pose::Idle;
-        drawPet(c, l, PAD + 50 + i * (w - 2 * PAD - 100) / 3, artY, 190);
+        drawPet(c, l, PAD + 40 + i * (w - 2 * PAD - 80) / 4, artY, 150);
       }
       break;
     case 1:
@@ -1316,23 +1316,28 @@ void drawConfirm(Canvas& c, const UiState& ui, const PetModel& pet, const Clock&
 }
 
 int adoptButtons(int w, int h, Button* out) {
-  const int cw = (w - 2 * PAD - 18) / 2, ch = (h - 200 - PAD - 18) / 2;
-  for (int i = 0; i < 4; ++i) {
-    out[i] = {Box{PAD + (i % 2) * (cw + 18), 170 + (i / 2) * (ch + 18), cw, ch}, Act::Adopt, i};
+  // Five eggs: three on top, two centred below.
+  const int gap = 14, cw = (w - 2 * PAD - 2 * gap) / 3, ch = (h - 150 - PAD - gap) / 2;
+  const int n = static_cast<int>(Species::Count);
+  for (int i = 0; i < n; ++i) {
+    const int row = i / 3, col = i % 3;
+    const int rowCount = row == 0 ? 3 : n - 3;
+    const int left = (w - (rowCount * cw + (rowCount - 1) * gap)) / 2;
+    out[i] = {Box{left + col * (cw + gap), 140 + row * (ch + gap), cw, ch}, Act::Adopt, i};
   }
-  return 4;
+  return n;
 }
 
 void drawAdopt(Canvas& c, const UiState& ui, const Button* b, int nb) {
   const int w = c.width();
   c.textCentered(w / 2, 40, "Choose your egg", T_TITLE + 6, true);
   c.textCentered(w / 2, 96, "Who will hatch? You can't peek!", T_BODY);
-  const char* hints[4] = {"Spotty egg", "Stripy egg", "Fluffy egg", "Seed pot"};
+  const char* hints[5] = {"Spotty egg", "Stripy egg", "Fluffy egg", "Seed pot", "Bunny egg"};
   for (int i = 0; i < nb; ++i) {
     const Box& x = b[i].box;
     card(c, x, ui.focus == i);
-    drawEgg(c, static_cast<Species>(b[i].arg), x.cx(), x.y + x.h - 70, 190, 0);
-    c.textCentered(x.cx(), x.y + x.h - 52, hints[b[i].arg], T_LABEL, true);
+    drawEgg(c, static_cast<Species>(b[i].arg), x.cx(), x.y + x.h - 58, 160, 0);
+    c.textCentered(x.cx(), x.y + x.h - 44, hints[b[i].arg], T_BODY, true);
   }
 }
 

@@ -197,13 +197,13 @@ int main(int argc, char** argv) {
   ui.banner = Event::Returned;
   shot("24_returned", ui, pet, clk);
   // Other species homes.
-  for (int sp = 1; sp < 4; ++sp) {
+  for (int sp = 1; sp < 5; ++sp) {
     PetModel p2;
     p2.adopt((Species)sp, nullptr, clk);
     p2.tapEgg(clk);
     p2.tapEgg(clk);
     p2.tapEgg(clk);
-    p2.s.stage = (Stage)(sp + 1);
+    p2.s.stage = (Stage)(sp + 1 > 4 ? 4 : sp + 1);
     p2.s.personality = sp == 3 ? Personality::Foodie : sp == 2 ? Personality::Cuddly : Personality::None;
     p2.s.readCreditSec = 50 * 60;
     p2.s.fullness = 80;
@@ -212,6 +212,37 @@ int main(int argc, char** argv) {
     char n[32];
     snprintf(n, sizeof n, "25_home_sp%d", sp);
     shot(n, u, p2, clk);
+  }
+  // Rabbit through every stage and pose.
+  {
+    PetModel r;
+    r.adopt(Species::Rabbit, nullptr, clk);
+    UiState u;
+    shot("60_bunny_egg", u, r, clk);
+    r.tapEgg(clk);
+    r.tapEgg(clk);
+    shot("61_bunny_egg_cracked", u, r, clk);
+    r.tapEgg(clk);
+    r.s.fullness = 80;
+    r.lastPose = Pose::Idle;
+    shot("62_bunny_baby", u, r, clk);
+    r.s.stage = Stage::Child;
+    r.lastPose = Pose::Excited;
+    shot("63_bunny_child", u, r, clk);
+    r.s.stage = Stage::Teen;
+    r.s.personality = Personality::Foodie;
+    r.lastPose = Pose::Eating;
+    shot("64_bunny_youth", u, r, clk);
+    r.s.stage = Stage::Adult;
+    r.s.personality = Personality::Active;
+    r.lastPose = Pose::Idle;
+    shot("65_bunny_adult", u, r, clk);
+    shot("66_bunny_night", u, r, Clock{true, clk.epoch, clk.day, 23, 10});
+    u.screen = Screen::StatusFull;
+    u.status = 4;
+    shot("67_bunny_status", u, r, clk);
+    u.screen = Screen::Adopt;
+    shot("68_adopt_five", u, r, clk);
   }
   return 0;
 }

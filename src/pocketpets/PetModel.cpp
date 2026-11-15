@@ -48,6 +48,7 @@ constexpr uint8_t DOG = 1 + static_cast<uint8_t>(Species::Dog);
 constexpr uint8_t CAT = 1 + static_cast<uint8_t>(Species::Cat);
 constexpr uint8_t CLOUD = 1 + static_cast<uint8_t>(Species::Cloud);
 constexpr uint8_t PLANT = 1 + static_cast<uint8_t>(Species::Plant);
+constexpr uint8_t RABBIT = 1 + static_cast<uint8_t>(Species::Rabbit);
 
 // %n is replaced with the pet's name.
 const Line LINES[] = {
@@ -87,6 +88,11 @@ const Line LINES[] = {
     {CONTENT, CLOUD, "Partly cloudy, fully cute."},
     {CONTENT, PLANT, "*rustle rustle*"},
     {CONTENT, PLANT, "Growing a little every day."},
+    {CONTENT, RABBIT, "*ear twitch*"},
+    {CONTENT, RABBIT, "Got any carrots? Asking for me."},
+    {CONTENT, RABBIT, "*happy binky*"},
+    {HUNGRY, RABBIT, "My nose is twitching for carrots..."},
+    {LOVED, RABBIT, "*flops over happily*"},
     {CONTENT | YOUNG, ANY, "Everything is so big!"},
     {CONTENT | YOUNG, ANY, "What's that? And that?"},
     {CONTENT | FOODIE, ANY, "Thinking about bento..."},
@@ -126,6 +132,8 @@ const char* PetModel::defaultName(Species sp) {
       return "Puff";
     case Species::Plant:
       return "Sprout";
+    case Species::Rabbit:
+      return "Bun";
     default:
       return "Pet";
   }
@@ -141,6 +149,8 @@ const char* PetModel::speciesName(Species sp) {
       return "Cloud";
     case Species::Plant:
       return "Plant";
+    case Species::Rabbit:
+      return "Bunny";
     default:
       return "Pet";
   }
@@ -151,11 +161,11 @@ const char* PetModel::stageName(Stage st, Species sp) {
     case Stage::Egg:
       return sp == Species::Plant ? "Seed" : "Egg";
     case Stage::Baby:
-      return sp == Species::Plant ? "Sprout" : "Baby";
+      return sp == Species::Plant ? "Sprout" : sp == Species::Rabbit ? "Hatchling" : "Baby";
     case Stage::Child:
       return "Child";
     case Stage::Teen:
-      return "Teen";
+      return sp == Species::Rabbit ? "Youth" : "Teen";
     case Stage::Adult:
       return "Adult";
   }

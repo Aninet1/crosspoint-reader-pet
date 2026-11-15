@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "BunnySprites.h"
+
 namespace pp {
 
 namespace {
@@ -376,9 +378,80 @@ void drawPlant(const Pen& p, const PetLook& look) {
   if (look.wear == PetLook::Headphones) drawHeadwear(p, look, 0, 22, 28);
 }
 
+// Draws a packed sprite with its bottom centre at (cx, baseY). When shrinking,
+// every source row and run is kept so thin lines don't disappear.
+void drawSprite(Canvas& c, const Sprite& s, int cx, int baseY, float scale) {
+  const int dw = iround(s.w * scale) > 0 ? iround(s.w * scale) : 1;
+  const int dh = iround(s.h * scale) > 0 ? iround(s.h * scale) : 1;
+  const int x0 = cx - dw / 2, y0 = baseY - dh;
+  for (int dy = 0; dy < dh; ++dy) {
+    const int sy0 = dy * s.h / dh;
+    int sy1 = (dy + 1) * s.h / dh;
+    if (sy1 <= sy0) sy1 = sy0 + 1;
+    for (int pass = 1; pass <= 2; ++pass) {  // white first, then the lines on top
+      for (int sy = sy0; sy < sy1 && sy < s.h; ++sy) {
+        const uint8_t* p = s.data + s.rows[sy];
+        int x = 0;
+        while (x < s.w) {
+          const uint8_t b = *p++;
+          const int col = b >> 6, n = (b & 63) + 1;
+          if (col == pass) {
+            const int a = x0 + x * dw / s.w;
+            int e = x0 + ((x + n) * dw + s.w - 1) / s.w - 1;
+            if (pass == 2 && e < a) e = a;
+            if (e >= a) c.rect(a, y0 + dy, e - a + 1, 1, pass == 2 ? Ink::Black : Ink::White);
+          }
+          x += n;
+        }
+      }
+    }
+  }
+}
+
+BunnySprite bunnyPose(const PetLook& look) {
+  using B = BunnySprite;
+  const bool sad = look.hungry || look.pose == Pose::Sad;
+  auto pick = [&](B idle, B feed, B pet, B play, B hungry, B tired) {
+    if (look.sleeping) return tired;
+    if (look.pose == Pose::Eating) return feed;
+    if (look.pose == Pose::Happy) return pet;
+    if (look.pose == Pose::Excited) return play;
+    if (sad) return hungry;
+    return idle;
+  };
+  switch (look.stage) {
+    case Stage::Egg:
+    case Stage::Baby:
+      return pick(B::BabyIdle, B::BabyFeed, B::BabyPet, B::BabyPlay, B::BabyHungry, B::BabyTired);
+    case Stage::Child:
+      return pick(B::ChildIdle, B::ChildFeed, B::ChildPet, B::ChildPlay, B::ChildHungry, B::ChildTired);
+    default: {
+      // Youth and Adult have three forms; a Bookworm rabbit takes the affectionate one.
+      int form = 1;
+      if (look.personality == Personality::Foodie) form = 0;
+      if (look.personality == Personality::Active) form = 2;
+      const int base = static_cast<int>(look.stage == Stage::Teen ? B::YouthFoodieIdle : B::AdultFoodieIdle) + form * 4;
+      const B idle = static_cast<B>(base), feed = static_cast<B>(base + 1), pet = static_cast<B>(base + 2),
+              play = static_cast<B>(base + 3);
+      return pick(idle, feed, pet, play, idle, B::ChildTired);
+    }
+  }
+}
+
 }  // namespace
 
 void drawPet(Canvas& c, const PetLook& look, int cx, int baseY, int size) {
+  if (look.species == Species::Rabbit) {
+    const Sprite& s = BUNNY_SPRITES[static_cast<int>(bunnyPose(look))];
+    // Sprites are drawn to the original firmware's scale at the home-screen size.
+    float scale = size / 262.0f;
+    if (look.stage >= Stage::Teen && look.sleeping) scale *= 1.08f;
+    drawSprite(c, s, cx, baseY + 2, scale);
+    if (look.sleeping) {
+      drawZzz(c, cx + iround(s.w * scale * 0.3f), baseY - iround(s.h * scale * 0.95f), iround(size * 0.11f));
+    }
+    return;
+  }
   float scale = STAGE_SCALE[static_cast<int>(look.stage)];
   if (look.species == Species::Plant && look.stage >= Stage::Teen) scale *= 0.9f;  // flowers grow tall
   Pen p{c, cx, baseY, size * scale / 100.0f};
@@ -413,6 +486,14 @@ void drawZzz(Canvas& c, int x, int y, int size) {
 }
 
 void drawEgg(Canvas& c, Species sp, int cx, int baseY, int size, int cracks) {
+  if (sp == Species::Rabbit) {
+    const BunnySprite e = cracks <= 0   ? BunnySprite::EggIntact
+                          : cracks == 1 ? BunnySprite::EggCrackOne
+                                        : BunnySprite::EggCrackTwo;
+    const Sprite& s = BUNNY_SPRITES[static_cast<int>(e)];
+    drawSprite(c, s, cx, baseY, size / 250.0f);
+    return;
+  }
   Pen p{c, cx, baseY, size / 100.0f};
   const int st = p.stroke();
   if (sp == Species::Plant) {

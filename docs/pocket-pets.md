@@ -6,8 +6,18 @@ cover-grid layout keeps its fixed tabs).
 
 ## The pet
 
-- **Four species:** dog, cat, cloud and plant. Pick an egg (or a seed pot) and
-  tap it three times to hatch it.
+- **Five species:** dog, cat, cloud, plant and the Sticky Bunny rabbit. Pick an
+  egg (or a seed pot) and tap it three times to hatch it. Every species follows
+  the same rules (stages, personality, needs, sleep, outings, streaks); only the
+  artwork differs.
+- **The rabbit** uses the original artwork from
+  [reTerminal Sticky Bunny](https://github.com/limengdu/reTerminal_Sticky_Bunny)
+  (MIT License, Copyright (c) 2026 limengdu; notice in
+  `src/pocketpets/third_party/STICKY_BUNNY_LICENSE`): egg and cracks, hatchling,
+  child, and the Foodie, Affectionate and Active youth and adult forms, each with
+  idle, feed, pet and play poses. A Bookworm or Cuddly rabbit takes the
+  Affectionate form. The sprites are packed by `tools/pocketpets_assets/gen_bunny.py`
+  into about 100 KB of flash.
 - **Five stages:** Egg → Baby → Child → Teen → Adult. Growth comes from daily
   care, at most 10 points a day; an hour of reading a day reaches adulthood in
   about two weeks.
@@ -86,6 +96,7 @@ to go back.
 | `src/pocketpets/PetStore.*` | Saves to `/.crosspoint/pet.json`; reading time, pet talk and quotes |
 | `src/pocketpets/BookChatter.*` | Book chatter: what the pet notices in your book |
 | `src/pocketpets/Tarot.cpp` | Tarot cards and readings |
+| `src/pocketpets/BunnySprites.*` | Rabbit sprites (generated; MIT, reTerminal Sticky Bunny) |
 | `src/pocketpets/TodoList.*`, `TodoSync.*` | To-do list, schedule, Todoist sync (`/.crosspoint/todo.json`) |
 | `src/activities/pocketpets/` | The activity: input, timers, IMU, buzzer |
 | `test/pocketpets/PetModelTest.cpp` | Host tests for the model |

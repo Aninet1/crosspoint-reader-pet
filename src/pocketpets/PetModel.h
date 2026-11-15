@@ -6,7 +6,7 @@
 
 namespace pp {
 
-enum class Species : uint8_t { Dog, Cat, Cloud, Plant, Count };
+enum class Species : uint8_t { Dog, Cat, Cloud, Plant, Rabbit, Count };
 enum class Stage : uint8_t { Egg, Baby, Child, Teen, Adult };
 enum class Personality : uint8_t { None, Foodie, Cuddly, Active, Bookworm };
 enum class Mode : uint8_t { Awake, Sleeping, Napping, Away };

@@ -133,8 +133,13 @@ const char* reactionFor(Species sp, uint32_t r) {
   static const char* const CAT[] = {"*purr purr*", "...fine, one more."};
   static const char* const CLOUD[] = {"*fluffs up*", "So cosy!"};
   static const char* const PLANT[] = {"*leaves sway*", "I feel greener already!"};
+  static const char* const RABBIT[] = {"*nose wiggle*", "Behind the ears, please!"};
   if (r % 3 == 0) {
-    const char* const* t = sp == Species::Dog ? DOG : sp == Species::Cat ? CAT : sp == Species::Cloud ? CLOUD : PLANT;
+    const char* const* t = sp == Species::Dog      ? DOG
+                           : sp == Species::Cat    ? CAT
+                           : sp == Species::Cloud  ? CLOUD
+                           : sp == Species::Rabbit ? RABBIT
+                                                   : PLANT;
     return t[(r / 3) % 2];
   }
   return COMMON[r % 4];
