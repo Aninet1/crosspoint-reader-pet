@@ -86,12 +86,21 @@ class Canvas {
                   Ink ink = Ink::Black) {
     return wrap(cx, y, maxW, t, size, lineGap, maxLines, bold, ink, true);
   }
+  // Word-wraps with the left edge at x. Returns lines drawn.
+  int textWrappedLeft(int x, int y, int maxW, const char* t, int size, int lineGap, int maxLines, bool bold = false,
+                      Ink ink = Ink::Black) {
+    leftAlign_ = true;
+    const int n = wrap(x, y, maxW, t, size, lineGap, maxLines, bold, ink, true);
+    leftAlign_ = false;
+    return n;
+  }
   int countLines(int maxW, const char* t, int size, int maxLines, bool bold = false) {
     return wrap(0, 0, maxW, t, size, 0, maxLines, bold, Ink::Black, false);
   }
 
  private:
   Surface& s_;
+  bool leftAlign_ = false;
   void hspan(int x0, int x1, int y, Ink ink);
   int wrap(int cx, int y, int maxW, const char* t, int size, int lineGap, int maxLines, bool bold, Ink ink, bool draw);
 };

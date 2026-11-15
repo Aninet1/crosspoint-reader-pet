@@ -72,5 +72,7 @@ class PocketPetsActivity final : public Activity {
   void editText(bool petName);
   void editTodoText(bool token);
   void requestTodoSync();
+  void updateBirthCards();
+  void dealTarot(uint32_t now);
   void adoptKeepingCredit(pp::Species sp);
 };

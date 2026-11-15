@@ -72,6 +72,9 @@ enum class Act : uint8_t {
   AnsMode,
   AnsHold,
   AnsAgain,
+  TarotSpread,
+  TarotQuestion,
+  TarotBirthday,
   GuidePrev,
   GuideNext,
   SetRename,
@@ -121,6 +124,13 @@ struct UiState {
   // Book of Answers
   uint8_t ansMode = 0;    // 0 message, 1 yes or no, 2 tarot
   bool reversed = false;  // tarot card drawn upside down
+
+  // Tarot reading
+  uint8_t spread = 0;  // 0 one card, 1 past/present/future, 2 card of the day
+  int8_t cards[3] = {0, 0, 0};
+  bool cardRev[3] = {false, false, false};
+  char question[72] = "";
+  int8_t birthCard = -1, birthCard2 = -1;
   AnsPhase ans = AnsPhase::Ask;
   int answer = 0;
   int thinkFrame = 0;
@@ -166,6 +176,11 @@ const char* yesNoText(int index);  // index 0..2
 constexpr int TAROT_COUNT = 22;
 const char* tarotName(int card);
 const char* tarotMeaning(int card, bool reversed);
+const char* tarotKeywords(int card, bool reversed);
+// Shuffles the deck from `seed` and deals `count` cards, each upright or reversed.
+void tarotShuffleDraw(uint32_t seed, int count, int* cards, bool* reversed);
+// Birth card from a date of birth; `second` gets the paired card or -1.
+int tarotBirthCards(int year, int month, int day, int& second);
 void drawTarotCard(Canvas& c, int card, bool reversed, int cx, int cy, int h);
 void drawTarotBack(Canvas& c, int cx, int cy, int h);
 

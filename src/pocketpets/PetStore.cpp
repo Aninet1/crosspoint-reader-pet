@@ -175,6 +175,7 @@ void PetStore::toJson(JsonDocument& doc) const {
   doc["chatter"] = s.chatterOn;
   doc["quotes"] = s.quotesOn;
   doc["customStatus"] = customStatus;
+  doc["birthday"] = birthday;
 
   std::lock_guard<std::mutex> lock(chatterMutex);
   const pp::BookMemory& b = chatter.m;
@@ -266,6 +267,7 @@ bool PetStore::fromJson(JsonVariantConst doc) {
     }
     chatter.m = b;
   }
+  birthday = doc["birthday"] | 0;
   strncpy(customStatus, doc["customStatus"] | "BACK SOON", sizeof(customStatus) - 1);
   customStatus[sizeof(customStatus) - 1] = 0;
   return true;

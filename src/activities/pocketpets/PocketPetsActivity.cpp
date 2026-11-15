@@ -3,6 +3,7 @@
 #include <GfxRenderer.h>
 #include <HalTiltSensor.h>
 #include <Logging.h>
+#include <esp_random.h>
 
 #include <cctype>
 #include <cmath>
@@ -149,6 +150,7 @@ void PocketPetsActivity::onEnter() {
   buzzerReady = buzzer.begin();
   ui.hasImu = halTiltSensor.isAvailable();
   ui.todo = &TODO_STORE.list;
+  updateBirthCards();
   strncpy(ui.customStatus, PET_STORE.customStatus, sizeof(ui.customStatus) - 1);
 
   PetModel& pet = PET_STORE.model;
@@ -683,6 +685,44 @@ void PocketPetsActivity::act(const Button& b) {
         ui.ans = AnsPhase::Retry;  // a tap isn't a shake: show the reminder
       }
       break;
+    case Act::TarotSpread:
+      ui.spread = static_cast<uint8_t>(b.arg);
+      break;
+    case Act::TarotQuestion:
+      startActivityForResult(
+          std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "Your question", ui.question, 70),
+          [this](const ActivityResult& result) {
+            if (result.isCancelled) return;
+            if (const auto* k = std::get_if<KeyboardResult>(&result.data)) {
+              RenderLock lock;
+              snprintf(ui.question, sizeof(ui.question), "%s", k->text.c_str());
+            }
+            fullRefreshNext = true;
+          });
+      return;
+    case Act::TarotBirthday: {
+      char initial[16] = "";
+      const int32_t bd = PET_STORE.birthday;
+      if (bd)
+        snprintf(initial, sizeof initial, "%04d-%02d-%02d", static_cast<int>(bd / 10000),
+                 static_cast<int>(bd / 100 % 100), static_cast<int>(bd % 100));
+      startActivityForResult(
+          std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "Birthday (YYYY-MM-DD)", initial, 10),
+          [this](const ActivityResult& result) {
+            if (result.isCancelled) return;
+            if (const auto* k = std::get_if<KeyboardResult>(&result.data)) {
+              int y = 0, m = 0, d = 0;
+              if (sscanf(k->text.c_str(), "%d-%d-%d", &y, &m, &d) == 3 && y > 1900 && y < 2100 && m >= 1 && m <= 12 &&
+                  d >= 1 && d <= 31) {
+                PET_STORE.birthday = y * 10000 + m * 100 + d;
+                PET_STORE.markDirty();
+                updateBirthCards();
+              }
+            }
+            fullRefreshNext = true;
+          });
+      return;
+    }
     case Act::AnsAgain:
       go(Screen::Answers);
       return;
@@ -895,6 +935,38 @@ void PocketPetsActivity::editText(bool petName) {
                          });
 }
 
+void PocketPetsActivity::updateBirthCards() {
+  const int32_t bd = PET_STORE.birthday;
+  int second = -1;
+  const int first = bd ? tarotBirthCards(bd / 10000, bd / 100 % 100, bd % 100, second) : -1;
+  RenderLock lock;
+  ui.birthCard = static_cast<int8_t>(first);
+  ui.birthCard2 = static_cast<int8_t>(second);
+}
+
+void PocketPetsActivity::dealTarot(uint32_t now) {
+  int cards[3] = {0, 0, 0};
+  bool rev[3] = {false, false, false};
+  const Clock clk = PetStore::now();
+  uint32_t seed;
+  if (ui.spread == 2 && clk.valid) {
+    // Card of the day: the same deal all day, different for each birthday.
+    seed =
+        static_cast<uint32_t>(clk.day) * 2654435761u ^ static_cast<uint32_t>(PET_STORE.birthday) * 40503u ^ 0xC0FFEEu;
+  } else {
+    // A real shuffle: the chip's hardware random source mixed with the shake.
+    seed = esp_random() ^ (now * 2246822519u) ^ (shakeMs << 7);
+  }
+  tarotShuffleDraw(seed, ui.spread == 1 ? 3 : 1, cards, rev);
+  RenderLock lock;
+  for (int k = 0; k < 3; ++k) {
+    ui.cards[k] = static_cast<int8_t>(cards[k]);
+    ui.cardRev[k] = rev[k];
+  }
+  ui.answer = cards[0];
+  ui.reversed = rev[0];
+}
+
 void PocketPetsActivity::requestTodoSync() {
   {
     RenderLock lock;
@@ -1005,14 +1077,23 @@ void PocketPetsActivity::updateMotion(uint32_t now) {
   // Book of Answers: thinking animation, then the reveal.
   if (ui.screen == Screen::Answers && ui.ans == AnsPhase::Thinking) {
     if (now >= thinkNextMs) {
-      RenderLock lock;
-      if (++ui.thinkFrame >= 4) {
-        ui.ans = AnsPhase::Result;
-        const uint32_t r = PET_STORE.model.s.rng = PET_STORE.model.s.rng * 1664525u + 1013904223u + now;
-        const int pool = ui.ansMode == 1 ? 3 : ui.ansMode == 2 ? TAROT_COUNT : answerCount();
-        ui.answer = static_cast<int>((r >> 8) % pool);
-        ui.reversed = ui.ansMode == 2 && ((r >> 3) & 3) == 0;  // about one card in four
-        lock.unlock();
+      bool reveal;
+      {
+        RenderLock lock;
+        reveal = ++ui.thinkFrame >= 4;
+      }
+      if (reveal) {
+        if (ui.ansMode == 2) {
+          dealTarot(now);
+        } else {
+          RenderLock lock;
+          const uint32_t r = esp_random() ^ (PET_STORE.model.s.rng = PET_STORE.model.s.rng * 1664525u + 1013904223u);
+          ui.answer = static_cast<int>((r >> 8) % (ui.ansMode == 1 ? 3 : answerCount()));
+        }
+        {
+          RenderLock lock;
+          ui.ans = AnsPhase::Result;
+        }
         chirp(2);
         relayout();
       }

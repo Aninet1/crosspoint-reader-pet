@@ -44,6 +44,41 @@ const Card CARDS[TAROT_COUNT] = {
     {"XXI", "The World", "You did it! Something comes full circle.", "Almost there. Finish the last bit."},
 };
 
+// Keywords for each card, upright then reversed.
+const char* const KEYWORDS[TAROT_COUNT][2] = {
+    {"new start, curiosity, a leap of faith", "hesitation, a careless step"},
+    {"skill, focus, making it happen", "scattered energy, unused talent"},
+    {"intuition, quiet knowing, mystery", "second-guessing, ignoring your gut"},
+    {"growth, comfort, creativity", "neglecting yourself, a creative block"},
+    {"structure, leadership, a steady plan", "rigidity, too much control"},
+    {"tradition, learning, good guidance", "breaking the mould, your own rules"},
+    {"connection, harmony, a choice of the heart", "imbalance, a mismatch"},
+    {"drive, willpower, moving forward", "losing direction, pushing too hard"},
+    {"gentle courage, patience, inner strength", "self-doubt, frayed nerves"},
+    {"reflection, solitude, inner guidance", "isolation, withdrawing too far"},
+    {"change, luck, a turning point", "a setback, resisting change"},
+    {"fairness, truth, cause and effect", "unfairness, dodging responsibility"},
+    {"a pause, letting go, a new view", "stalling, needless delay"},
+    {"an ending, transformation, clearing space", "holding on, fear of change"},
+    {"balance, moderation, patience", "excess, rushing things"},
+    {"attachment, habits, temptation", "release, breaking free"},
+    {"sudden change, upheaval, revelation", "a crisis avoided, change in slow motion"},
+    {"hope, renewal, calm", "discouragement, lost faith"},
+    {"uncertainty, dreams, intuition", "clarity returning, fears fading"},
+    {"joy, success, warmth", "a cloudy patch, passing blues"},
+    {"awakening, reflection, a calling", "self-criticism, ignoring the call"},
+    {"completion, wholeness, achievement", "unfinished business, nearly there"},
+};
+
+uint32_t mix(uint32_t x) {
+  x ^= x >> 16;
+  x *= 0x7feb352dU;
+  x ^= x >> 15;
+  x *= 0x846ca68bU;
+  x ^= x >> 16;
+  return x;
+}
+
 // Symbol pen: design units centred on (cx, cy), y up, optionally turned 180°.
 struct SPen {
   Canvas& c;
@@ -259,6 +294,53 @@ void drawSymbol(const SPen& p, int card) {
 
 }  // namespace
 
+const char* tarotKeywords(int card, bool reversed) {
+  return KEYWORDS[(card % TAROT_COUNT + TAROT_COUNT) % TAROT_COUNT][reversed ? 1 : 0];
+}
+
+void tarotShuffleDraw(uint32_t seed, int count, int* cards, bool* reversed) {
+  // Shuffle the whole deck (Fisher-Yates); each card lands either way up.
+  int deck[TAROT_COUNT];
+  bool turned[TAROT_COUNT];
+  uint32_t r = seed ? seed : 0x9E3779B9u;
+  for (int i = 0; i < TAROT_COUNT; ++i) {
+    deck[i] = i;
+    r = mix(r + 0x9E3779B9u);
+    turned[i] = r & 1;
+  }
+  for (int i = TAROT_COUNT - 1; i > 0; --i) {
+    r = mix(r + 0x9E3779B9u);
+    const int j = static_cast<int>(r % static_cast<uint32_t>(i + 1));
+    const int t = deck[i];
+    deck[i] = deck[j];
+    deck[j] = t;
+    const bool b = turned[i];
+    turned[i] = turned[j];
+    turned[j] = b;
+  }
+  for (int k = 0; k < count && k < TAROT_COUNT; ++k) {
+    cards[k] = deck[k];
+    reversed[k] = turned[k];
+  }
+}
+
+int tarotBirthCards(int year, int month, int day, int& second) {
+  // Month + day + year, then add the digits until it fits the Major Arcana.
+  second = -1;
+  if (year <= 0 || month < 1 || month > 12 || day < 1 || day > 31) return -1;
+  auto digits = [](int n) {
+    int t = 0;
+    for (; n > 0; n /= 10) t += n % 10;
+    return t;
+  };
+  int n = digits(month + day + year);
+  while (n > 22) n = digits(n);
+  if (n == 22) n = 0;  // 22 is the Fool
+  if (n >= 10) second = digits(n);
+  if (second == n) second = -1;
+  return n;
+}
+
 const char* tarotName(int card) { return CARDS[(card % TAROT_COUNT + TAROT_COUNT) % TAROT_COUNT].name; }
 const char* tarotMeaning(int card, bool reversed) {
   const Card& k = CARDS[(card % TAROT_COUNT + TAROT_COUNT) % TAROT_COUNT];
@@ -278,12 +360,15 @@ void drawTarotCard(Canvas& c, int card, bool reversed, int cx, int cy, int h) {
   c.sparkle(b.x + b.w - 26, b.y + b.h - 26, 6, Ink::Black);
   const Card& k = CARDS[(card % TAROT_COUNT + TAROT_COUNT) % TAROT_COUNT];
   // The numeral sits at the top; a reversed card shows it at the bottom.
-  const int ny = reversed ? b.y + b.h - 54 : b.y + 22;
-  c.textCentered(cx, ny, k.numeral, 26, true);
-  const SPen p{c, cx, cy, h / 170.0f, reversed};
-  // A soft halo behind the symbol.
-  c.circle(cx, cy, h * 26 / 100, Ink::Gray);
-  c.circle(cx, cy, h * 26 / 100 - 6, Ink::White);
+  const int ns = h * 26 / 380 < 15 ? 15 : h * 26 / 380;
+  const int ny = reversed ? b.y + b.h - h * 6 / 100 - ns - 4 : b.y + h * 6 / 100;
+  c.textCentered(cx, ny, k.numeral, ns, true);
+  // The symbol sits a little away from the numeral.
+  const int sy = cy + (reversed ? -h / 30 : h / 30);
+  const SPen p{c, cx, sy, h / 185.0f, reversed};
+  const int halo = h * 24 / 100;
+  c.circle(cx, sy, halo, Ink::Gray);
+  c.circle(cx, sy, halo - (h > 250 ? 6 : 4), Ink::White);
   drawSymbol(p, card);
 }
 

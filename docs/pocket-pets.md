@@ -58,8 +58,16 @@ Open **Apps** on the pet screen.
   pet scene and a "since 9:41am" time. The status stays on the screen while the
   Sticky sleeps.
 - **Book of Answers:** hold a question in mind and shake for three seconds.
-  MESSAGE picks one of 135 answers; YES / NO uses the crystal ball; TAROT draws
-  one of the 22 Major Arcana, upright or reversed, with a short reading.
+  MESSAGE picks one of 135 answers; YES / NO uses the crystal ball.
+- **Tarot** (in the Book of Answers): the 22 Major Arcana, read like a real
+  deck. Shaking shuffles the whole deck (the chip's hardware random source)
+  and each card lands upright or reversed by chance, so about half come up
+  reversed. Spreads: *One card*, *Past-Now-Next* (three different cards read
+  by position), or *Today* (a card of the day that stays the same until
+  midnight). Type an optional question before you shuffle. Add your birthday
+  for your birth cards (month + day + year, digits added until 21 or less,
+  22 is the Fool); the reading says when one comes up. Each card has upright
+  and reversed keywords and a short reading.
 - **Gestures in the Apps sheet:** shake for Answers, turn the device sideways for
   the Status board.
 
@@ -91,6 +99,7 @@ Host tests (from the repository root):
 g++ -std=c++17 -I src test/pocketpets/PetModelTest.cpp src/pocketpets/PetModel.cpp && ./a.out
 g++ -std=c++17 -I src test/pocketpets/BookChatterTest.cpp src/pocketpets/BookChatter.cpp src/pocketpets/PetModel.cpp && ./a.out
 g++ -std=c++17 -I src -I .pio/libdeps/sticky/ArduinoJson/src test/pocketpets/TodoListTest.cpp src/pocketpets/TodoList.cpp && ./a.out
+g++ -std=c++17 -I src -I .pio/libdeps/sticky/ArduinoJson/src test/pocketpets/TarotTest.cpp $(ls src/pocketpets/*.cpp | grep -v -e PetStore -e TodoSync) && ./a.out
 ```
 
 Previews: compile `tools/pocketpets_preview/screens.cpp` with `src/pocketpets/*.cpp`

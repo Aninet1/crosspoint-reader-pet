@@ -25,6 +25,7 @@ class PetStore : public PersistableStore<PetStore> {
   pp::BookChatter chatter;
   mutable std::mutex chatterMutex;
   char customStatus[24] = "BACK SOON";
+  int32_t birthday = 0;  // YYYYMMDD for tarot birth cards, 0 = not set
 
   static const char* getFilePath() { return "/.crosspoint/pet.json"; }
   void toJson(JsonDocument& doc) const;

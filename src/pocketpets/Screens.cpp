@@ -892,12 +892,19 @@ int answersButtons(const UiState& ui, int w, int h, Button* out) {
   int n = 0;
   out[n++] = backButton();
   if (ui.ans == AnsPhase::Result) {
-    out[n++] = {Box{PAD, h - 110, w - 2 * PAD, 70}, Act::AnsAgain, 0};
+    out[n++] = {Box{PAD, h - 96, w - 2 * PAD, 64}, Act::AnsAgain, 0};
     return n;
   }
   const int sw = (w - 2 * PAD - 2 * 10) / 3;
-  for (int i = 0; i < 3; ++i) out[n++] = {Box{PAD + i * (sw + 10), 92, sw, 52}, Act::AnsMode, i};
-  out[n++] = {Box{w / 2 - 150, 190, 300, 300}, Act::AnsHold, 0};
+  for (int i = 0; i < 3; ++i) out[n++] = {Box{PAD + i * (sw + 10), 88, sw, 50}, Act::AnsMode, i};
+  if (ui.ansMode == 2) {
+    for (int i = 0; i < 3; ++i) out[n++] = {Box{PAD + i * (sw + 10), 150, sw, 44}, Act::TarotSpread, i};
+    out[n++] = {Box{w / 2 - 130, 206, 260, 250}, Act::AnsHold, 0};
+    out[n++] = {Box{PAD, 470, w - 2 * PAD, 52}, Act::TarotQuestion, 0};
+    out[n++] = {Box{PAD, 534, w - 2 * PAD, 46}, Act::TarotBirthday, 0};
+  } else {
+    out[n++] = {Box{w / 2 - 150, 190, 300, 300}, Act::AnsHold, 0};
+  }
   return n;
 }
 
@@ -935,18 +942,69 @@ void drawCrystal(Canvas& c, int cx, int cy, int s) {
   c.roundRect(cx - r + 12, cy + r - 8, 2 * r - 24, s / 6 - 12, 10, Ink::Gray);
 }
 
+void drawTarotReading(Canvas& c, const UiState& ui, const Button* b, int nb) {
+  const int w = c.width();
+  int top = 78;
+  if (ui.question[0]) {
+    char q[96];
+    snprintf(q, sizeof q, "\"%s\"", ui.question);
+    top += 6 + c.textWrapped(w / 2, top, w - 2 * PAD, q, T_SMALL, 4, 2) * (T_SMALL + 4);
+  }
+  bool birthSeen = false;
+  if (ui.spread == 1) {
+    static const char* const POS[3] = {"PAST", "PRESENT", "FUTURE"};
+    static const char* const POS_LINE[3] = {"Behind you", "Where you are", "What's coming"};
+    const int ch = 190, step = (w - 2 * PAD) / 3;
+    for (int k = 0; k < 3; ++k) {
+      const int cx = PAD + step / 2 + k * step;
+      c.textCentered(cx, top + 2, POS[k], T_SMALL - 1, true);
+      drawTarotCard(c, ui.cards[k], ui.cardRev[k], cx, top + 30 + ch / 2, ch);
+      c.textWrapped(cx, top + 42 + ch, step - 8, tarotName(ui.cards[k]), T_SMALL - 1, 2, 2, true);
+      birthSeen |= ui.cards[k] == ui.birthCard || (ui.birthCard2 >= 0 && ui.cards[k] == ui.birthCard2);
+    }
+    int y = top + ch + 96;
+    for (int k = 0; k < 3; ++k) {
+      char head[80];
+      snprintf(head, sizeof head, "%s: %s%s", POS_LINE[k], tarotName(ui.cards[k]), ui.cardRev[k] ? ", reversed" : "");
+      c.text(PAD, y, head, T_SMALL, true);
+      y += T_SMALL + 6;
+      y += c.textWrappedLeft(PAD + 12, y, w - 2 * PAD - 12, tarotKeywords(ui.cards[k], ui.cardRev[k]), T_SMALL, 4, 2) *
+           (T_SMALL + 4);
+      y += 12;
+    }
+    if (birthSeen) c.textCentered(w / 2, y + 2, "Your birth card came up. Pay it extra attention.", T_SMALL, true);
+  } else {
+    const int card = ui.cards[0];
+    const bool rev = ui.cardRev[0];
+    const int ch = ui.question[0] ? 300 : 330;
+    if (ui.spread == 2) {
+      c.textCentered(w / 2, top, "Your card for today", T_SMALL, true);
+      top += T_SMALL + 6;
+    }
+    drawTarotCard(c, card, rev, w / 2, top + 6 + ch / 2, ch);
+    int y = top + ch + 22;
+    c.textCentered(w / 2, y, tarotName(card), T_TITLE, true);
+    y += T_TITLE + 12;
+    const char* way = rev ? "Reversed" : "Upright";
+    const int tw = c.textWidth(way, T_SMALL, true);
+    c.roundRect(w / 2 - tw / 2 - 16, y, tw + 32, 30, 15, Ink::Black);
+    c.textCentered(w / 2, y + 4, way, T_SMALL, true, Ink::White);
+    y += 40;
+    y += c.textWrapped(w / 2, y, w - 2 * PAD - 20, tarotKeywords(card, rev), T_SMALL + 1, 4, 2) * (T_SMALL + 5) + 8;
+    c.textWrapped(w / 2, y, w - 2 * PAD - 20, tarotMeaning(card, rev), T_LABEL, 6, 2, true);
+    birthSeen = card == ui.birthCard || (ui.birthCard2 >= 0 && card == ui.birthCard2);
+    if (birthSeen) c.textCentered(w / 2, c.height() - 126, "This is your birth card!", T_SMALL, true);
+  }
+  for (int i = 1; i < nb; ++i) {
+    pill(c, b[i].box, ui.spread == 2 ? "Done" : "New reading", ui.focus == i, true);
+  }
+}
+
 void drawAnswers(Canvas& c, const UiState& ui, const Button* b, int nb) {
   const int w = c.width(), h = c.height();
   header(c, "Book of Answers", ui.focus == 0);
   if (ui.ans == AnsPhase::Result && ui.ansMode == 2) {
-    drawTarotCard(c, ui.answer, ui.reversed, w / 2, 290, 380);
-    c.textCentered(w / 2, 500, tarotName(ui.answer), T_TITLE + 2, true);
-    const char* way = ui.reversed ? "Reversed" : "Upright";
-    const int tw = c.textWidth(way, T_SMALL, true);
-    c.roundRect(w / 2 - tw / 2 - 16, 546, tw + 32, 30, 15, Ink::Black);
-    c.textCentered(w / 2, 550, way, T_SMALL, true, Ink::White);
-    c.textWrapped(w / 2, 592, w - 2 * PAD - 30, tarotMeaning(ui.answer, ui.reversed), T_LABEL + 2, 8, 3);
-    for (int i = 1; i < nb; ++i) pill(c, b[i].box, "Draw again", ui.focus == i, true);
+    drawTarotReading(c, ui, b, nb);
     return;
   }
   if (ui.ans == AnsPhase::Result) {
@@ -972,14 +1030,43 @@ void drawAnswers(Canvas& c, const UiState& ui, const Button* b, int nb) {
         c.frame(x.x, x.y, x.w, x.h, x.h / 2, ui.focus == i ? 5 : 3, Ink::Black);
         c.textCentered(x.cx(), x.y + 14, MODES[b[i].arg], T_SMALL + 1, true);
       }
+    } else if (b[i].act == Act::TarotSpread) {
+      static const char* const SPREADS[3] = {"One card", "Past-Now-Next", "Today"};
+      const bool on = b[i].arg == ui.spread;
+      if (on) {
+        c.roundRect(x.x, x.y, x.w, x.h, x.h / 2, Ink::Black);
+      } else {
+        c.frame(x.x, x.y, x.w, x.h, x.h / 2, ui.focus == i ? 4 : 2, Ink::Black);
+      }
+      c.textCentered(x.cx(), x.y + 12, SPREADS[b[i].arg], T_SMALL - 1, true, on ? Ink::White : Ink::Black);
+    } else if (b[i].act == Act::TarotQuestion) {
+      c.frame(x.x, x.y, x.w, x.h, x.h / 2, ui.focus == i ? 5 : 3, Ink::Black);
+      if (ui.question[0]) {
+        char q[80];
+        snprintf(q, sizeof q, "\"%.40s%s\"", ui.question, strlen(ui.question) > 40 ? "..." : "");
+        c.textCentered(x.cx(), x.y + 14, q, T_BODY - 1);
+      } else {
+        c.textCentered(x.cx(), x.y + 14, "Ask a question (optional)", T_BODY - 1, true);
+      }
+    } else if (b[i].act == Act::TarotBirthday) {
+      char bc[80];
+      if (ui.birthCard >= 0) {
+        snprintf(bc, sizeof bc, "Birth card: %s%s%s", tarotName(ui.birthCard), ui.birthCard2 >= 0 ? " & " : "",
+                 ui.birthCard2 >= 0 ? tarotName(ui.birthCard2) : "");
+      } else {
+        snprintf(bc, sizeof bc, "Add your birthday for birth cards");
+      }
+      if (ui.focus == i) focusMarks(c, x);
+      c.sparkle(x.x + 16, x.cy(), 7, Ink::Black);
+      c.textCentered(x.cx() + 8, x.y + 12, bc, T_SMALL, ui.birthCard < 0);
     } else if (b[i].act == Act::AnsHold) {
       if (ui.focus == i) focusMarks(c, x);
       if (ui.ansMode == 1) {
         drawCrystal(c, x.cx(), x.cy(), 280);
       } else if (ui.ansMode == 2) {  // a small fanned deck
-        drawTarotBack(c, x.cx() - 70, x.cy() + 14, 230);
-        drawTarotBack(c, x.cx() + 70, x.cy() + 14, 230);
-        drawTarotBack(c, x.cx(), x.cy(), 260);
+        drawTarotBack(c, x.cx() - 62, x.cy() + 12, 200);
+        drawTarotBack(c, x.cx() + 62, x.cy() + 12, 200);
+        drawTarotBack(c, x.cx(), x.cy(), 226);
       } else {
         drawBook(c, x.cx(), x.cy(), 270, false);
       }
@@ -993,21 +1080,27 @@ void drawAnswers(Canvas& c, const UiState& ui, const Button* b, int nb) {
   } else if (ui.ans == AnsPhase::Retry) {
     msg = ui.hasImu ? "Shake a little longer! Keep going for three seconds." : "Hold a little longer!";
   } else {
-    msg = ui.ansMode == 2 ? (ui.hasImu ? "Think of your question, then shake for three seconds to shuffle the deck."
-                                       : "Think of your question, then press and hold the deck to shuffle.")
-          : ui.hasImu     ? "Hold a question in your mind, then shake me for three seconds."
-                          : "Hold a question in your mind, then press and hold the book.";
+    msg =
+        ui.ansMode == 2
+            ? (ui.spread == 2 ? (ui.hasImu ? "Shake to reveal today's card." : "Hold the deck to reveal today's card.")
+               : ui.hasImu    ? "Focus on your question, then shake for three seconds to shuffle."
+                              : "Focus on your question, then hold the deck to shuffle.")
+        : ui.hasImu ? "Hold a question in your mind, then shake me for three seconds."
+                    : "Hold a question in your mind, then press and hold the book.";
   }
-  c.textWrapped(w / 2, 540, w - 2 * PAD - 40, msg, T_LABEL, 8, 3, ui.ans == AnsPhase::Thinking);
+  const int msgY = ui.ansMode == 2 ? 600 : 540;
+  c.textWrapped(w / 2, msgY, w - 2 * PAD - 40, msg, T_LABEL, 8, 3, ui.ans == AnsPhase::Thinking);
   if (ui.shakePct > 0 && ui.ans != AnsPhase::Thinking) {
-    const int bx = PAD + 40, bw = w - 2 * PAD - 80, by = 660;
+    const int bx = PAD + 40, bw = w - 2 * PAD - 80, by = ui.ansMode == 2 ? 696 : 660;
     c.roundRect(bx, by, bw, 20, 10, Ink::Black);
     c.roundRect(bx + 4, by + 4, bw - 8, 12, 6, Ink::White);
     const int fw = (bw - 8) * (ui.shakePct > 100 ? 100 : ui.shakePct) / 100;
     if (fw > 4) c.roundRect(bx + 4, by + 4, fw, 12, 6, Ink::Dark);
   }
   if (ui.ans == AnsPhase::Thinking) {
-    for (int i = 0; i < 3; ++i) c.sparkle(w / 2 - 60 + i * 60, 680 - ((ui.thinkFrame + i) % 2) * 14, 10, Ink::Black);
+    for (int i = 0; i < 3; ++i) {
+      c.sparkle(w / 2 - 60 + i * 60, (ui.ansMode == 2 ? 712 : 680) - ((ui.thinkFrame + i) % 2) * 14, 10, Ink::Black);
+    }
   }
   (void)h;
 }

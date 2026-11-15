@@ -101,6 +101,36 @@ int main(int argc, char** argv) {
     snprintf(n, sizeof n, "40_tarot_%02d", i);
     shot(n, ui, pet, clk);
   }
+  // Real-style tarot readings.
+  ui.ans = AnsPhase::Ask;
+  ui.spread = 1;
+  snprintf(ui.question, sizeof ui.question, "Should I apply for the summer internship?");
+  {
+    int s2 = -1;
+    ui.birthCard = static_cast<int8_t>(tarotBirthCards(1998, 7, 14, s2));
+    ui.birthCard2 = static_cast<int8_t>(s2);
+  }
+  shot("41_tarot_ask_full", ui, pet, clk);
+  ui.ans = AnsPhase::Result;
+  ui.cards[0] = 16;
+  ui.cards[1] = 12;
+  ui.cards[2] = 19;
+  ui.cardRev[0] = true;
+  ui.cardRev[1] = false;
+  ui.cardRev[2] = false;
+  shot("42_tarot_three", ui, pet, clk);
+  ui.spread = 2;
+  ui.question[0] = 0;
+  ui.cards[0] = 17;
+  ui.cardRev[0] = false;
+  shot("43_tarot_day", ui, pet, clk);
+  ui.spread = 0;
+  ui.cards[0] = 12;
+  ui.cardRev[0] = true;
+  snprintf(ui.question, sizeof ui.question, "Will the move go well?");
+  shot("44_tarot_one_birth", ui, pet, clk);
+  ui.question[0] = 0;
+  ui.spread = 0;
   ui.ansMode = 0;
   {
     TodoList todo;

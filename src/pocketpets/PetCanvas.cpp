@@ -271,7 +271,11 @@ int Canvas::wrap(int cx, int y, int maxW, const char* t, int size, int lineGap, 
       line[len] = 0;
       consumed = we;
     }
-    if (draw) textCentered(cx, y + lines * (size + lineGap), line, size, bold, ink);
+    if (draw && leftAlign_) {
+      s_.text(cx, y + lines * (size + lineGap), line, size, bold, ink);
+    } else if (draw) {
+      textCentered(cx, y + lines * (size + lineGap), line, size, bold, ink);
+    }
     ++lines;
     p = consumed;
   }
